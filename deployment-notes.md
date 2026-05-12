@@ -5,41 +5,33 @@
 - `index.html`
 - `map-module-wardley.md`
 - `supabase-waitlist.sql`
+- `deployment-notes.md`
 
-## Git Blocker
+## GitHub
 
-The sandbox can edit files, but shell commands cannot create directories in this workspace.
+Repository:
 
-That blocks `git init`, because Git needs to create `.git/`.
+`https://github.com/feygon/SensoryNav`
 
-Run this locally from `D:\Repos\SensoryNav`:
+Pages URL:
+
+`https://feygon.github.io/SensoryNav/`
+
+Pages source:
+
+- Branch: `gh-pages`
+- Path: `/`
+
+## Local Git
 
 ```powershell
-git init -b main
-git add index.html map-module-wardley.md supabase-waitlist.sql deployment-notes.md
-git commit -m "Initial SensoryNav site and map module notes"
-git checkout -b gh-pages
+git status
+git log --oneline --decorate --all --graph -n 5
 ```
-
-## GitHub Pages
-
-After creating a GitHub repo:
-
-```powershell
-git remote add origin https://github.com/<owner>/<repo>.git
-git push -u origin main
-git push -u origin gh-pages
-```
-
-Then enable Pages from:
-
-`Settings -> Pages -> Deploy from branch -> gh-pages -> /root`
-
-The public URL will usually be:
-
-`https://<owner>.github.io/<repo>/`
 
 ## Supabase
+
+Supabase cloud project creation still requires a Supabase access token or browser login.
 
 Run `supabase-waitlist.sql` in the Supabase SQL editor.
 
@@ -56,3 +48,18 @@ Rows are inserted with:
 - `notify_email = 'rnickerson@realfeygon.com'`
 
 Actual email notifications require a Supabase database webhook, Edge Function, or email provider integration.
+
+## Codex CLI Fix Applied
+
+The local Codex CLI was downgraded from `0.130.0` to `0.122.0`.
+
+`C:\Users\feygo\.codex\config.toml` was also changed:
+
+- removed stale `[windows] sandbox = "unelevated"`
+- changed default model from `gpt-5.5` to `gpt-5.4`
+
+Reason:
+
+- `0.130.0` correlated with recurring WebSocket/HTTPS fallback and Windows sandbox ACL issues.
+- `0.122.0` is the last locally observed stable version line.
+- `gpt-5.5` requires newer Codex versions, so the stable pairing is currently `0.122.0` + `gpt-5.4`.
