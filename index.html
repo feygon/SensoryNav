@@ -4,50 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SensoryNav</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 640px;
-      margin: 80px auto;
-      padding: 0 20px;
-      line-height: 1.5;
-    }
-
-    h1 {
-      font-size: 42px;
-      margin-bottom: 8px;
-    }
-
-    .soon {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 24px;
-    }
-
-    form {
-      margin-top: 28px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    input {
-      font-size: 16px;
-      padding: 10px;
-      min-width: 260px;
-      border: 1px solid #999;
-    }
-
-    button {
-      font-size: 16px;
-      padding: 10px 16px;
-      border: 1px solid #333;
-      background: #eee;
-      cursor: pointer;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="build-version">v...</div>
   <h1>SensoryNav</h1>
   <div class="soon">Coming soon</div>
   <p>A calmer map for people who want smoother roads, quieter routes, and fewer sensory ambushes.</p>
@@ -59,34 +19,6 @@
   <p id="form-status" aria-live="polite"></p>
   <a id="download-json" href="project-entry.json">Project entry JSON</a>
 
-  <script>
-    const form = document.getElementById("waitlist-form");
-    const status = document.getElementById("form-status");
-    const downloadLink = document.getElementById("download-json");
-    const waitlist = JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]");
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const email = new FormData(form).get("email");
-      const signup = {
-        email,
-        tag: "waitlist",
-        source: "SensoryNav",
-        created_at: new Date().toISOString()
-      };
-
-      waitlist.push(signup);
-      localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
-
-      const blob = new Blob([JSON.stringify(waitlist, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      downloadLink.href = url;
-      downloadLink.download = "sensorynav-waitlist.json";
-      downloadLink.textContent = "Download waitlist JSON";
-
-      form.reset();
-      status.textContent = "You're on the waitlist. Saved locally as JSON.";
-    });
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
