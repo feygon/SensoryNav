@@ -27,5 +27,5 @@ form.addEventListener("submit", (event) => {
   localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
   form.reset();
-  status.textContent = "You're on the waitlist for this browser. Backend sync is not connected yet.";
+  status.textContent = "You're on the waitlist.";
 });
