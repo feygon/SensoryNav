@@ -57,44 +57,35 @@
     <button type="submit">Join waitlist</button>
   </form>
   <p id="form-status" aria-live="polite"></p>
+  <a id="download-json" href="project-entry.json">Project entry JSON</a>
 
   <script>
-    const SUPABASE_URL = "YOUR_SUPABASE_URL";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-
     const form = document.getElementById("waitlist-form");
     const status = document.getElementById("form-status");
+    const downloadLink = document.getElementById("download-json");
+    const waitlist = JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]");
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      status.textContent = "Sending...";
-
       const email = new FormData(form).get("email");
+      const signup = {
+        email,
+        tag: "waitlist",
+        source: "SensoryNav",
+        created_at: new Date().toISOString()
+      };
 
-      try {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/waitlist_signups`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            "Prefer": "return=minimal"
-          },
-          body: JSON.stringify({
-            email,
-            tag: "waitlist"
-          })
-        });
+      waitlist.push(signup);
+      localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-        if (!response.ok) {
-          throw new Error("Signup failed");
-        }
+      const blob = new Blob([JSON.stringify(waitlist, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.download = "sensorynav-waitlist.json";
+      downloadLink.textContent = "Download waitlist JSON";
 
-        form.reset();
-        status.textContent = "You're on the waitlist.";
-      } catch (error) {
-        status.textContent = "Something went wrong. Please try again.";
-      }
+      form.reset();
+      status.textContent = "You're on the waitlist. Saved locally as JSON.";
     });
   </script>
 </body>
