@@ -1,12 +1,12 @@
 const form = document.getElementById("waitlist-form");
 const status = document.getElementById("form-status");
 const buildVersion = document.getElementById("build-version");
-const darkModeLink = document.getElementById("dark-mode-link");
+const modeCopy = document.getElementById("mode-copy");
 let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]"));
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.0.6")
+fetch("build.json?v=0.0.7")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
@@ -48,10 +48,7 @@ form.addEventListener("submit", (event) => {
   status.textContent = "You're on the waitlist.";
 });
 
-darkModeLink.addEventListener("click", (event) => {
-  event.preventDefault();
-  document.body.classList.add("dark-mode");
-});
+renderModeCopy();
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -100,4 +97,18 @@ function latestDate(firstDate, secondDate) {
   }
 
   return new Date(firstDate) > new Date(secondDate) ? firstDate : secondDate;
+}
+
+function renderModeCopy() {
+  const isDarkMode = document.body.classList.contains("dark-mode");
+
+  modeCopy.innerHTML = isDarkMode
+    ? `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, like that nasty white webpage. Click <a href="#" id="dark-mode-link">here</a> to go back to light mode... <em>*shudder*</em>`
+    : `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, like this nasty white webpage. Click <a href="#" id="dark-mode-link">here</a> for dark mode.`;
+
+  document.getElementById("dark-mode-link").addEventListener("click", (event) => {
+    event.preventDefault();
+    document.body.classList.toggle("dark-mode");
+    renderModeCopy();
+  });
 }
