@@ -17,6 +17,11 @@ body.dark-mode a {
   color: #9ecbff;
 }
 
+body.dark-mode .comic-preview img {
+  border-color: #555;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+}
+
 #build-version {
   position: fixed;
   top: 8px;
@@ -34,6 +39,18 @@ h1 {
   font-size: 22px;
   font-weight: bold;
   margin-bottom: 24px;
+}
+
+.comic-preview {
+  margin: 28px 0 0;
+}
+
+.comic-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 2px solid #111;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.18);
 }
 
 form {
