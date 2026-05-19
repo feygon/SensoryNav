@@ -4,7 +4,7 @@ const buildVersion = document.getElementById("build-version");
 const darkModeLink = document.getElementById("dark-mode-link");
 const waitlist = JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]");
 
-fetch("build.json")
+fetch("build.json?v=0.0.4")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
