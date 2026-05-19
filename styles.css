@@ -1,9 +1,10 @@
 body {
   font-family: Arial, sans-serif;
-  max-width: 640px;
+  max-width: 900px;
   margin: 80px auto;
   padding: 0 20px;
   line-height: 1.5;
+  font-size: 32px;
   color: #111;
   background: #fff;
 }
@@ -26,17 +27,17 @@ body.dark-mode .comic-preview img {
   position: fixed;
   top: 8px;
   left: 8px;
-  font-size: 11px;
+  font-size: 22px;
   color: #666;
 }
 
 h1 {
-  font-size: 42px;
+  font-size: 84px;
   margin-bottom: 8px;
 }
 
 .soon {
-  font-size: 22px;
+  font-size: 44px;
   font-weight: bold;
   margin-bottom: 24px;
 }
@@ -61,16 +62,43 @@ form {
 }
 
 input {
-  font-size: 16px;
+  font-size: 32px;
   padding: 10px;
-  min-width: 260px;
+  min-width: 0;
+  flex: 1 1 360px;
   border: 1px solid #999;
 }
 
 button {
-  font-size: 16px;
+  font-size: 32px;
   padding: 10px 16px;
   border: 1px solid #333;
   background: #eee;
   cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  body {
+    max-width: none;
+    margin: 48px auto;
+    font-size: 22px;
+  }
+
+  #build-version {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 54px;
+  }
+
+  .soon {
+    font-size: 30px;
+  }
+
+  input,
+  button {
+    width: 100%;
+    font-size: 22px;
+  }
 }
