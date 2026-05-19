@@ -1,6 +1,7 @@
 const form = document.getElementById("waitlist-form");
 const status = document.getElementById("form-status");
 const buildVersion = document.getElementById("build-version");
+const darkModeLink = document.getElementById("dark-mode-link");
 const waitlist = JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]");
 
 fetch("build.json")
@@ -28,4 +29,9 @@ form.addEventListener("submit", (event) => {
 
   form.reset();
   status.textContent = "You're on the waitlist.";
+});
+
+darkModeLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  document.body.classList.add("dark-mode");
 });
