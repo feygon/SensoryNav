@@ -6,7 +6,7 @@ let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-wai
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.1.1")
+fetch("build.json?v=0.2.0")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
@@ -15,7 +15,7 @@ fetch("build.json?v=0.1.1")
     buildVersion.textContent = "";
   });
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const email = normalizeEmail(new FormData(form).get("email"));
@@ -26,6 +26,74 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
+  status.textContent = "Joining...";
+
+  try {
+    const signup = await submitWaitlistSignup(email);
+    mirrorSignupLocally(signup);
+    form.reset();
+    status.textContent = "You're on the waitlist.";
+  } catch (error) {
+    saveLocalSignup(email, now);
+    status.textContent = "Saved on this device. Waitlist sync is unavailable; please try again later.";
+  }
+});
+
+renderModeCopy();
+
+async function submitWaitlistSignup(email) {
+  const response = await fetch("/api/waitlist", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      email,
+      tag: "waitlist",
+      source: "SensoryNav"
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Waitlist API request failed.");
+  }
+
+  const payload = await response.json();
+
+  if (!payload.ok || !payload.signup) {
+    throw new Error("Waitlist API returned an invalid response.");
+  }
+
+  return payload.signup;
+}
+
+function mirrorSignupLocally(signup) {
+  const email = normalizeEmail(signup.email);
+
+  if (!email) {
+    return;
+  }
+
+  const existingSignup = waitlist.find((entry) => entry.email === email);
+  const mirroredSignup = {
+    email,
+    tag: "waitlist",
+    source: signup.source || "SensoryNav",
+    created_at: signup.created_at,
+    updated_at: signup.updated_at,
+    signup_count: signup.signup_count || 1
+  };
+
+  if (existingSignup) {
+    Object.assign(existingSignup, mirroredSignup);
+  } else {
+    waitlist.push(mirroredSignup);
+  }
+
+  localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
+}
+
+function saveLocalSignup(email, now) {
   const existingSignup = waitlist.find((signup) => signup.email === email);
 
   if (existingSignup) {
@@ -43,12 +111,7 @@ form.addEventListener("submit", (event) => {
   }
 
   localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
-
-  form.reset();
-  status.textContent = "You're on the waitlist.";
-});
-
-renderModeCopy();
+}
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
