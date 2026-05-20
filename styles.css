@@ -92,6 +92,7 @@ td {
 }
 
 .site-nav {
+  align-items: center;
   display: flex;
   gap: 18px;
   margin-bottom: 18px;
@@ -100,6 +101,50 @@ td {
 
 .site-nav a[aria-current="page"] {
   font-weight: bold;
+}
+
+.theme-button {
+  align-items: center;
+  border: 1px solid #333;
+  background: #eee;
+  color: #111;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  font: inherit;
+  line-height: 1;
+  padding: 6px 10px;
+}
+
+body.dark-mode .theme-button,
+html.dark-mode body .theme-button {
+  border-color: #777;
+  background: #222;
+  color: #eee;
+}
+
+.inline-theme-button {
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.bulb-icon {
+  display: block;
+  flex: 0 0 auto;
+  height: 1.1em;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 1.1em;
+}
+
+.bulb-icon-on {
+  color: #f5b700;
+}
+
+.bulb-icon-off {
+  color: currentColor;
 }
 
 .soon {
