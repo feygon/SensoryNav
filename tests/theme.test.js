@@ -10,6 +10,7 @@ let themeHandler;
 const toggleLabels = [];
 const themeToggle = {
   textContent: "",
+  innerHTML: "",
   setAttribute(name, value) {
     this[name] = value;
   },
@@ -62,7 +63,9 @@ vm.runInContext(script, context);
 
 assert.strictEqual(htmlClasses.has("dark-mode"), true);
 assert.strictEqual(bodyClasses.has("dark-mode"), true);
-assert.strictEqual(toggleLabels[0].element.textContent, "Light mode");
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes("bulb-icon-on"), true);
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes("Light mode"), true);
+assert.strictEqual(toggleLabels[0].element["aria-label"], "Switch to light mode");
 
 toggleLabels[0].handler({ preventDefault() {} });
 
@@ -70,6 +73,9 @@ assert.strictEqual(store["sensorynav-theme"], "light");
 assert.strictEqual(htmlClasses.has("dark-mode"), false);
 assert.strictEqual(bodyClasses.has("dark-mode"), false);
 assert.strictEqual(themeHandler.detail.theme, "light");
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes("bulb-icon-off"), true);
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes("Dark mode"), true);
+assert.strictEqual(toggleLabels[0].element["aria-label"], "Switch to dark mode");
 
 console.log("theme tests passed");
 

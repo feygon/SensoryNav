@@ -6,7 +6,7 @@ let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-wai
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.2.2")
+fetch("build.json?v=0.2.3")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
@@ -169,8 +169,12 @@ function renderModeCopy() {
     : document.body.classList.contains("dark-mode");
 
   modeCopy.innerHTML = isDarkMode
-    ? `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, like that nasty white webpage. Click <a href="#" id="dark-mode-link">here</a> to go back to light mode... <em>*shudder*</em>`
-    : `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, <strong>like this nasty white webpage</strong>. Click <a href="#" id="dark-mode-link">here</a> for dark mode.`;
+    ? `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, like that nasty white webpage. Click <button type="button" class="theme-button inline-theme-button" id="dark-mode-link" data-theme-toggle></button> to go back to light mode... <em>*shudder*</em>`
+    : `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, <strong>like this nasty white webpage</strong>. Click <button type="button" class="theme-button inline-theme-button" id="dark-mode-link" data-theme-toggle></button> for dark mode.`;
+
+  if (window.SensoryNavTheme) {
+    window.SensoryNavTheme.applyTheme(window.SensoryNavTheme.getTheme());
+  }
 
   document.getElementById("dark-mode-link").addEventListener("click", (event) => {
     event.preventDefault();

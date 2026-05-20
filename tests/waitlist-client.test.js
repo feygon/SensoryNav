@@ -28,6 +28,7 @@ const context = {
   window: {
     addEventListener() {},
     SensoryNavTheme: {
+      applyTheme() {},
       getTheme() {
         return "light";
       },
@@ -70,7 +71,7 @@ const context = {
     if (url.startsWith("build.json")) {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ version: "0.2.2" })
+        json: () => Promise.resolve({ version: "0.2.3" })
       });
     }
 
