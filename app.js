@@ -6,7 +6,7 @@ let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-wai
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.2.0")
+fetch("build.json?v=0.2.1")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
