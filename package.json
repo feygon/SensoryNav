@@ -1,9 +1,9 @@
 {
   "name": "sensorynav",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js"
+    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js && node tests/theme.test.js"
   }
 }

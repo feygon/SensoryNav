@@ -25,6 +25,15 @@ const context = {
   Map,
   Array,
   String,
+  window: {
+    addEventListener() {},
+    SensoryNavTheme: {
+      getTheme() {
+        return "light";
+      },
+      toggleTheme() {}
+    }
+  },
   localStorage: {
     getItem(key) {
       return store[key] || null;
@@ -61,7 +70,7 @@ const context = {
     if (url.startsWith("build.json")) {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ version: "0.2.0" })
+        json: () => Promise.resolve({ version: "0.2.2" })
       });
     }
 

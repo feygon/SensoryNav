@@ -6,7 +6,7 @@ let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-wai
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.2.1")
+fetch("build.json?v=0.2.2")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
@@ -40,6 +40,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 renderModeCopy();
+window.addEventListener("sensorynav-theme-change", renderModeCopy);
 
 async function submitWaitlistSignup(email) {
   const response = await fetch("/api/waitlist", {
@@ -163,7 +164,9 @@ function latestDate(firstDate, secondDate) {
 }
 
 function renderModeCopy() {
-  const isDarkMode = document.body.classList.contains("dark-mode");
+  const isDarkMode = window.SensoryNavTheme
+    ? window.SensoryNavTheme.getTheme() === "dark"
+    : document.body.classList.contains("dark-mode");
 
   modeCopy.innerHTML = isDarkMode
     ? `A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, like that nasty white webpage. Click <a href="#" id="dark-mode-link">here</a> to go back to light mode... <em>*shudder*</em>`
@@ -171,7 +174,11 @@ function renderModeCopy() {
 
   document.getElementById("dark-mode-link").addEventListener("click", (event) => {
     event.preventDefault();
-    document.body.classList.toggle("dark-mode");
-    renderModeCopy();
+    if (window.SensoryNavTheme) {
+      window.SensoryNavTheme.toggleTheme();
+    } else {
+      document.body.classList.toggle("dark-mode");
+      renderModeCopy();
+    }
   });
 }
