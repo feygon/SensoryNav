@@ -1,10 +1,10 @@
 body {
   font-family: Arial, sans-serif;
   max-width: 900px;
-  margin: 80px auto;
+  margin: 48px auto;
   padding: 0 20px;
   line-height: 1.5;
-  font-size: 32px;
+  font-size: 26px;
   color: #111;
   background: #fff;
 }
@@ -23,27 +23,119 @@ body.dark-mode .comic-preview img {
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
 }
 
+body.dark-mode .collaborator-card,
+body.dark-mode .template-note {
+  border-color: #555;
+  background: #191919;
+}
+
+body.dark-mode .collaborator-art {
+  border-color: #777;
+  background: #2a2a2a;
+}
+
 #build-version {
   position: fixed;
   top: 8px;
   left: 8px;
-  font-size: 22px;
+  font-size: 18px;
   color: #666;
 }
 
 h1 {
-  font-size: 84px;
+  font-size: 68px;
   margin-bottom: 8px;
 }
 
-.soon {
-  font-size: 44px;
+h2 {
+  font-size: 36px;
+  margin: 0 0 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 20px;
+}
+
+th,
+td {
+  padding: 12px;
+  border: 1px solid #999;
+  text-align: left;
+  vertical-align: top;
+}
+
+.site-nav {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 18px;
+  font-size: 20px;
+}
+
+.site-nav a[aria-current="page"] {
   font-weight: bold;
-  margin-bottom: 24px;
+}
+
+.soon {
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+
+.page-intro {
+  margin: 0 0 22px;
+}
+
+.collaborator-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.collaborator-card {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 20px;
+  padding: 20px;
+  border: 2px solid #111;
+  background: #fafafa;
+}
+
+.collaborator-art {
+  display: grid;
+  min-height: 140px;
+  place-items: center;
+  border: 2px solid #111;
+  background: #eee;
+  font-size: 36px;
+  font-weight: bold;
+}
+
+.collaborator-label {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.quip,
+.connection {
+  margin: 0 0 16px;
+}
+
+.card-link {
+  font-weight: bold;
+}
+
+.template-note {
+  margin-top: 24px;
+  padding: 20px;
+  border: 2px solid #111;
+  background: #fafafa;
 }
 
 .comic-preview {
-  margin: 32px 0 0;
+  margin: 20px 0 0;
 }
 
 .comic-preview img {
@@ -55,14 +147,14 @@ h1 {
 }
 
 form {
-  margin-top: 28px;
+  margin-top: 18px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
 input {
-  font-size: 32px;
+  font-size: 26px;
   padding: 10px;
   min-width: 0;
   flex: 1 1 360px;
@@ -70,7 +162,7 @@ input {
 }
 
 button {
-  font-size: 32px;
+  font-size: 26px;
   padding: 10px 16px;
   border: 1px solid #333;
   background: #eee;
@@ -80,8 +172,8 @@ button {
 @media (max-width: 700px) {
   body {
     max-width: none;
-    margin: 48px auto;
-    font-size: 22px;
+    margin: 32px auto;
+    font-size: 20px;
   }
 
   #build-version {
@@ -89,11 +181,41 @@ button {
   }
 
   h1 {
-    font-size: 54px;
+    font-size: 46px;
   }
 
   .soon {
+    font-size: 26px;
+  }
+
+  h2 {
     font-size: 30px;
+  }
+
+  table {
+    font-size: 18px;
+  }
+
+  th,
+  td {
+    padding: 8px;
+  }
+
+  .site-nav {
+    font-size: 20px;
+  }
+
+  .collaborator-card {
+    grid-template-columns: 1fr;
+  }
+
+  .collaborator-art {
+    min-height: 120px;
+    font-size: 34px;
+  }
+
+  .collaborator-label {
+    font-size: 16px;
   }
 
   input,
