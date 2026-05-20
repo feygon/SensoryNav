@@ -74,6 +74,8 @@ assert.strictEqual(htmlClasses.has("dark-mode"), false);
 assert.strictEqual(bodyClasses.has("dark-mode"), false);
 assert.strictEqual(themeHandler.detail.theme, "light");
 assert.strictEqual(toggleLabels[0].element.innerHTML.includes("bulb-icon-off"), true);
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes('fill="#000"'), true);
+assert.strictEqual(toggleLabels[0].element.innerHTML.includes('fill="#fff"'), true);
 assert.strictEqual(toggleLabels[0].element.innerHTML.includes("Dark mode"), true);
 assert.strictEqual(toggleLabels[0].element["aria-label"], "Switch to dark mode");
 
