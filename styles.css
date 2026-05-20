@@ -14,11 +14,25 @@ body.dark-mode {
   background: #111;
 }
 
+html.dark-mode body {
+  color: #eee;
+  background: #111;
+}
+
 body.dark-mode a {
   color: #9ecbff;
 }
 
+html.dark-mode body a {
+  color: #9ecbff;
+}
+
 body.dark-mode .comic-preview img {
+  border-color: #555;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+}
+
+html.dark-mode body .comic-preview img {
   border-color: #555;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
 }
@@ -29,7 +43,18 @@ body.dark-mode .template-note {
   background: #191919;
 }
 
+html.dark-mode body .collaborator-card,
+html.dark-mode body .template-note {
+  border-color: #555;
+  background: #191919;
+}
+
 body.dark-mode .collaborator-art {
+  border-color: #777;
+  background: #2a2a2a;
+}
+
+html.dark-mode body .collaborator-art {
   border-color: #777;
   background: #2a2a2a;
 }
