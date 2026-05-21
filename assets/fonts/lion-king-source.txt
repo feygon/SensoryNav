@@ -1,0 +1,5 @@
+Lion King
+Source requested: https://www.fonts4free.net/lion-king-font.html
+Listed license on source page: free for personal use; not free for commercial use.
+Downloaded through the source page's download flow.
+Vendored font file: lion_king.ttf

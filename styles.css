@@ -4,6 +4,12 @@
   src: url("assets/fonts/ringbearer-medium.ttf") format("truetype");
 }
 
+@font-face {
+  font-family: "LionKing";
+  font-display: swap;
+  src: url("assets/fonts/lion_king.ttf") format("truetype");
+}
+
 body {
   font-family: Arial, sans-serif;
   max-width: 900px;
@@ -257,6 +263,18 @@ body.tingles-page {
 body.dark-mode .tingles-prompt,
 html.dark-mode body .tingles-prompt {
   color: #eee;
+}
+
+.tingles-lion {
+  color: #d9982d;
+  font-family: "LionKing", "Ringbearer", "Cinzel Decorative", "Uncial Antiqua", Georgia, serif;
+  font-size: clamp(2.1rem, 14vw, 8rem);
+  line-height: 0.95;
+  margin-top: clamp(2rem, 7vh, 4.5rem);
+  text-shadow:
+    1px 1px 0 #75410e,
+    2px 2px 0 #3a2109,
+    0 0 18px rgba(217, 152, 45, 0.28);
 }
 
 form {
