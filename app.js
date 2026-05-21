@@ -176,13 +176,11 @@ function renderModeCopy() {
     window.SensoryNavTheme.applyTheme(window.SensoryNavTheme.getTheme());
   }
 
-  document.getElementById("dark-mode-link").addEventListener("click", (event) => {
-    event.preventDefault();
-    if (window.SensoryNavTheme) {
-      window.SensoryNavTheme.toggleTheme();
-    } else {
+  if (!window.SensoryNavTheme) {
+    document.getElementById("dark-mode-link").addEventListener("click", (event) => {
+      event.preventDefault();
       document.body.classList.toggle("dark-mode");
       renderModeCopy();
-    }
-  });
+    });
+  }
 }
