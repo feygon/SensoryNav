@@ -8,6 +8,7 @@ const htmlClasses = new Set();
 const bodyClasses = new Set();
 let themeHandler;
 const toggleLabels = [];
+let documentClickHandler;
 const themeToggle = {
   textContent: "",
   innerHTML: "",
@@ -54,6 +55,11 @@ const context = {
       }
 
       return [themeToggle];
+    },
+    addEventListener(type, handler) {
+      if (type === "click") {
+        documentClickHandler = handler;
+      }
     }
   }
 };
@@ -63,21 +69,28 @@ vm.runInContext(script, context);
 
 assert.strictEqual(htmlClasses.has("dark-mode"), true);
 assert.strictEqual(bodyClasses.has("dark-mode"), true);
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes("bulb-icon-on"), true);
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes("Light mode"), true);
-assert.strictEqual(toggleLabels[0].element["aria-label"], "Switch to light mode");
+assert.strictEqual(themeToggle.innerHTML.includes("bulb-icon-on"), true);
+assert.strictEqual(themeToggle.innerHTML.includes("Light mode"), true);
+assert.strictEqual(themeToggle["aria-label"], "Switch to light mode");
 
-toggleLabels[0].handler({ preventDefault() {} });
+documentClickHandler({
+  preventDefault() {},
+  target: {
+    closest(selector) {
+      return selector === "[data-theme-toggle]" ? themeToggle : null;
+    }
+  }
+});
 
 assert.strictEqual(store["sensorynav-theme"], "light");
 assert.strictEqual(htmlClasses.has("dark-mode"), false);
 assert.strictEqual(bodyClasses.has("dark-mode"), false);
 assert.strictEqual(themeHandler.detail.theme, "light");
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes("bulb-icon-off"), true);
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes('fill="#000"'), true);
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes('fill="#fff"'), true);
-assert.strictEqual(toggleLabels[0].element.innerHTML.includes("Dark mode"), true);
-assert.strictEqual(toggleLabels[0].element["aria-label"], "Switch to dark mode");
+assert.strictEqual(themeToggle.innerHTML.includes("bulb-icon-off"), true);
+assert.strictEqual(themeToggle.innerHTML.includes('fill="#000"'), true);
+assert.strictEqual(themeToggle.innerHTML.includes('fill="#fff"'), true);
+assert.strictEqual(themeToggle.innerHTML.includes("Dark mode"), true);
+assert.strictEqual(themeToggle["aria-label"], "Switch to dark mode");
 
 console.log("theme tests passed");
 
