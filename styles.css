@@ -223,23 +223,40 @@ html.dark-mode body .theme-button {
 }
 
 body.tingles-page {
+  min-height: calc(100vh - 96px);
   text-align: center;
 }
 
 .tingles-incantation {
   color: #b58a2a;
   font-family: "Ringbearer", "Cinzel Decorative", "Uncial Antiqua", "Palatino Linotype", Georgia, serif;
-  font-size: clamp(2rem, 6vw, 5rem);
+  font-size: clamp(1.35rem, 8.8vw, 4.8rem);
   letter-spacing: 0;
-  line-height: 1.3;
-  margin: 10vh auto 0;
-  max-width: 12em;
+  line-height: 1.08;
+  margin: clamp(2rem, 8vh, 5rem) auto 0;
+  max-width: min(100%, 13em);
+  overflow-wrap: normal;
   text-shadow:
     1px 1px 0 #6f4d10,
     2px 2px 0 #3d2a09,
     3px 3px 0 #1f1606,
     -1px -1px 0 #d1ad52,
     0 0 16px rgba(181, 138, 42, 0.35);
+  white-space: nowrap;
+}
+
+.tingles-prompt {
+  color: #111;
+  font-family: Arial, sans-serif;
+  font-size: 60%;
+  line-height: 1.25;
+  margin-bottom: 0.35em;
+  text-shadow: none;
+}
+
+body.dark-mode .tingles-prompt,
+html.dark-mode body .tingles-prompt {
+  color: #eee;
 }
 
 form {
