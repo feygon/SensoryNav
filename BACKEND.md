@@ -11,6 +11,8 @@ The waitlist now has a repo-local NoSQL-style JSON backend.
 
 This backend must run on a server. Static GitHub Pages cannot execute `server.js`.
 
+The published GitHub Pages site uses FormSubmit's AJAX endpoint to email waitlist submissions to `rnickerson@realfeygon.com`. The repo-local JSON backend is still used when the site is served from `node server.js`.
+
 ## Data File
 
 Waitlist records are stored as JSON documents in:
@@ -70,4 +72,6 @@ npm test
 
 GitHub Pages is static. It can serve the frontend files, but it cannot run this backend.
 
-To collect real production signups, deploy `server.js` somewhere that can run Node, then serve the site from that same origin or proxy `/api/waitlist` to the Node server.
+Production signups on GitHub Pages are emailed through FormSubmit because GitHub Pages is static.
+
+To collect real production signups into `data/waitlist.json`, deploy `server.js` somewhere that can run Node, then serve the site from that same origin or set `window.SENSORYNAV_WAITLIST_API_URL` before `app.js` loads.
