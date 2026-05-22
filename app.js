@@ -2,11 +2,12 @@ const form = document.getElementById("waitlist-form");
 const status = document.getElementById("form-status");
 const buildVersion = document.getElementById("build-version");
 const modeCopy = document.getElementById("mode-copy");
+const productionWaitlistEndpoint = "https://formsubmit.co/ajax/rnickerson@realfeygon.com";
 let waitlist = normalizeWaitlist(JSON.parse(localStorage.getItem("sensorynav-waitlist") || "[]"));
 
 localStorage.setItem("sensorynav-waitlist", JSON.stringify(waitlist, null, 2));
 
-fetch("build.json?v=0.2.4")
+fetch("build.json?v=0.2.5")
   .then((response) => response.json())
   .then((build) => {
     buildVersion.textContent = `v${build.version}`;
@@ -29,7 +30,7 @@ form.addEventListener("submit", async (event) => {
   status.textContent = "Joining...";
 
   try {
-    const signup = await submitWaitlistSignup(email);
+    const signup = await submitWaitlistSignup(email, now);
     mirrorSignupLocally(signup);
     form.reset();
     status.textContent = "You're on the waitlist.";
@@ -42,30 +43,76 @@ form.addEventListener("submit", async (event) => {
 renderModeCopy();
 window.addEventListener("sensorynav-theme-change", renderModeCopy);
 
-async function submitWaitlistSignup(email) {
-  const response = await fetch("/api/waitlist", {
+async function submitWaitlistSignup(email, now) {
+  const signupPayload = {
+    email,
+    tag: "waitlist",
+    source: "SensoryNav"
+  };
+  const endpoint = getWaitlistEndpoint();
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
+      "Accept": "application/json",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      email,
-      tag: "waitlist",
-      source: "SensoryNav"
-    })
+    body: JSON.stringify(endpoint === productionWaitlistEndpoint
+      ? formSubmitPayload(signupPayload, now)
+      : signupPayload)
   });
 
   if (!response.ok) {
     throw new Error("Waitlist API request failed.");
   }
 
-  const payload = await response.json();
+  const responsePayload = await response.json();
 
-  if (!payload.ok || !payload.signup) {
+  if (endpoint === productionWaitlistEndpoint) {
+    return {
+      email,
+      tag: "waitlist",
+      source: "SensoryNav",
+      created_at: now,
+      updated_at: now,
+      signup_count: nextLocalSignupCount(email)
+    };
+  }
+
+  if (!responsePayload.ok || !responsePayload.signup) {
     throw new Error("Waitlist API returned an invalid response.");
   }
 
-  return payload.signup;
+  return responsePayload.signup;
+}
+
+function getWaitlistEndpoint() {
+  if (window.SENSORYNAV_WAITLIST_API_URL) {
+    return window.SENSORYNAV_WAITLIST_API_URL;
+  }
+
+  return isGitHubPages() ? productionWaitlistEndpoint : "/api/waitlist";
+}
+
+function isGitHubPages() {
+  return window.location && window.location.hostname.endsWith("github.io");
+}
+
+function formSubmitPayload(payload, now) {
+  return {
+    email: payload.email,
+    tag: payload.tag,
+    source: payload.source,
+    signup_count: nextLocalSignupCount(payload.email),
+    submitted_at: now,
+    _subject: "SensoryNav waitlist signup",
+    _template: "table",
+    _captcha: "false"
+  };
+}
+
+function nextLocalSignupCount(email) {
+  const existingSignup = waitlist.find((signup) => signup.email === email);
+  return existingSignup ? (existingSignup.signup_count || 1) + 1 : 1;
 }
 
 function mirrorSignupLocally(signup) {
