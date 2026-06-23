@@ -1,6 +1,6 @@
 // tests/audio-scoring.test.js
 const assert = require("assert");
-const { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequency } = require("../recorder/audio-scoring");
+const { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequency, roughnessScore } = require("../recorder/audio-scoring");
 
 const sampleRate = 48000;
 const fftSize = 2048;
@@ -54,5 +54,24 @@ assert.deepStrictEqual(avg, { low: 3, mid: 6, high: 8 });
 
 // Empty frame list does not divide by zero.
 assert.deepStrictEqual(averageWindowEnergies([]), { low: 0, mid: 0, high: 0 });
+
+const baseline = {
+  effective_floor: { low: 10, mid: 10, high: 10 }
+};
+
+// Energy at baseline -> all deltas 0 -> score 0.
+assert.strictEqual(roughnessScore({ low: 10, mid: 10, high: 10 }, baseline), 0);
+
+// Energy below baseline still clamps deltas at 0 -> score 0.
+assert.strictEqual(roughnessScore({ low: 1, mid: 1, high: 1 }, baseline), 0);
+
+// Loud low band drives a high score; result stays within [0,100].
+const loud = roughnessScore({ low: 1000, mid: 1000, high: 1000 }, baseline);
+assert.ok(loud > 0 && loud <= 100, "loud score in range");
+assert.strictEqual(loud, 100);
+
+// A silent-baseline floor (1e-6) does not blow the score past 100.
+const flooredBaseline = { effective_floor: { low: 1e-6, mid: 1e-6, high: 1e-6 } };
+assert.strictEqual(roughnessScore({ low: 5, mid: 5, high: 5 }, flooredBaseline), 100);
 
 console.log("audio-scoring band tests passed");
