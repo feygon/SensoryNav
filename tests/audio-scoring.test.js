@@ -1,6 +1,6 @@
 // tests/audio-scoring.test.js
 const assert = require("assert");
-const { bandEnergiesFromSpectrum, averageWindowEnergies } = require("../recorder/audio-scoring");
+const { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequency } = require("../recorder/audio-scoring");
 
 const sampleRate = 48000;
 const fftSize = 2048;
@@ -24,6 +24,26 @@ assert.ok(energies.mid > energies.high, "mid should exceed high");
 // A bin centered exactly on 250 Hz belongs to the higher (mid) band.
 const edgeBin = Math.round(250 / hzPerBin);
 assert.ok(Math.abs(edgeBin * hzPerBin - 250) < hzPerBin, "sanity: edge bin near 250");
+
+// Direct boundary table for bandForFrequency: lower-inclusive, upper-exclusive,
+// with an edge frequency belonging to the higher band (e.g. 250 -> mid).
+const boundaryCases = [
+  [80, "low"],
+  [79.9, null],
+  [249.999, "low"],
+  [250, "mid"],
+  [999.999, "mid"],
+  [1000, "high"],
+  [3999.999, "high"],
+  [4000, null]
+];
+for (const [freq, expected] of boundaryCases) {
+  assert.strictEqual(
+    bandForFrequency(freq),
+    expected,
+    `bandForFrequency(${freq}) should be ${expected}`
+  );
+}
 
 // Averaging two frames returns the per-band mean.
 const avg = averageWindowEnergies([
