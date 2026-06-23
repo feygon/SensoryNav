@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js && node tests/theme.test.js && node tests/constants.test.js"
+    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js && node tests/theme.test.js && node tests/constants.test.js && node tests/cvd-scale.test.js"
   }
 }
