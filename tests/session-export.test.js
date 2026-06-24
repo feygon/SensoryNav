@@ -86,4 +86,21 @@ const formulaVersionResult = validateSession(emptyFormulaVersion);
 assert.strictEqual(formulaVersionResult.valid, false);
 assert.ok(formulaVersionResult.errors.some((e) => e.includes("score_formula_version")));
 
+// Omitted baseline is rejected, not silently accepted as an all-undefined object.
+const rebuiltWithoutBaseline = buildSession({
+  session_id: "s1",
+  created_at_ms: 1000,
+  calibration_status: "complete",
+  audio_windows: [
+    { window_id: "w1", started_at_ms: 1000, duration_ms: 1000, low_energy: 1, mid_energy: 1, high_energy: 1, low_delta: 0, mid_delta: 0, high_delta: 0, auditory_roughness_score: 0 }
+  ],
+  gps_samples: [],
+  located_samples: [],
+  user_agent: "test-agent"
+});
+assert.strictEqual(rebuiltWithoutBaseline.baseline, null);
+const noBaselineResult = validateSession(rebuiltWithoutBaseline);
+assert.strictEqual(noBaselineResult.valid, false);
+assert.ok(noBaselineResult.errors.some((e) => e.includes("baseline")));
+
 console.log("session-export tests passed");

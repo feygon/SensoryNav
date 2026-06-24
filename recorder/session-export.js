@@ -53,8 +53,11 @@ function projectLocatedSample(sample) {
 }
 
 function projectBaseline(baseline) {
+  if (baseline === null || baseline === undefined) {
+    return null;
+  }
   const projected = pick(baseline, BASELINE_FIELDS);
-  projected.effective_floor = pick(baseline ? baseline.effective_floor : undefined, EFFECTIVE_FLOOR_FIELDS);
+  projected.effective_floor = pick(baseline.effective_floor, EFFECTIVE_FLOOR_FIELDS);
   return projected;
 }
 

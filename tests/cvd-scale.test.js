@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { colorForScore, CONTROL_STOPS } = require("../recorder/cvd-scale");
+const { colorForScore, CONTROL_STOPS, NEUTRAL_COLOR } = require("../recorder/cvd-scale");
 
 const hex = /^#[0-9a-f]{6}$/;
 
@@ -20,5 +20,13 @@ function luminance(hexColor) {
   return ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114;
 }
 assert.ok(luminance(colorForScore(90)) > luminance(colorForScore(10)));
+
+// Invalid/unknown scores must never silently render as the "smoothest" color.
+assert.strictEqual(colorForScore(NaN), NEUTRAL_COLOR);
+assert.strictEqual(colorForScore(null), NEUTRAL_COLOR);
+assert.strictEqual(colorForScore(undefined), NEUTRAL_COLOR);
+
+// A legitimate zero score is unaffected and still maps to the first control stop.
+assert.strictEqual(colorForScore(0), CONTROL_STOPS[0]);
 
 console.log("cvd-scale tests passed");

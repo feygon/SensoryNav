@@ -3,11 +3,11 @@
 const { CONSTANTS } = require("./constants");
 const { colorForScore } = require("./cvd-scale");
 
-function nearestGps(window, gpsSamples, maxSkewMs) {
+function nearestGps(audioWindow, gpsSamples, maxSkewMs) {
   let best = null;
   let bestDist = Infinity;
   for (const gps of gpsSamples) {
-    const dist = Math.abs(gps.captured_at_ms - window.started_at_ms);
+    const dist = Math.abs(gps.captured_at_ms - audioWindow.started_at_ms);
     if (dist > maxSkewMs) {
       continue;
     }
@@ -22,29 +22,29 @@ function nearestGps(window, gpsSamples, maxSkewMs) {
 function pairWindowsWithGps(windows, gpsSamples, maxSkewSeconds) {
   const seconds = maxSkewSeconds === undefined ? CONSTANTS.PAIR_MAX_SKEW_SECONDS : maxSkewSeconds;
   const maxSkewMs = seconds * 1000;
-  return windows.map((window) => {
-    const match = nearestGps(window, gpsSamples, maxSkewMs);
+  return windows.map((audioWindow) => {
+    const match = nearestGps(audioWindow, gpsSamples, maxSkewMs);
     if (!match) {
       return {
-        window_id: window.window_id,
+        window_id: audioWindow.window_id,
         gps_sample_id: null,
         gps_captured_at_ms: null,
         location_status: "missing",
         latitude: null,
         longitude: null,
-        auditory_roughness_score: window.auditory_roughness_score,
+        auditory_roughness_score: audioWindow.auditory_roughness_score,
         color: null
       };
     }
     return {
-      window_id: window.window_id,
+      window_id: audioWindow.window_id,
       gps_sample_id: match.sample_id,
       gps_captured_at_ms: match.captured_at_ms,
       location_status: "paired",
       latitude: match.latitude,
       longitude: match.longitude,
-      auditory_roughness_score: window.auditory_roughness_score,
-      color: colorForScore(window.auditory_roughness_score)
+      auditory_roughness_score: audioWindow.auditory_roughness_score,
+      color: colorForScore(audioWindow.auditory_roughness_score)
     };
   });
 }
