@@ -12,6 +12,52 @@ const REQUIRED_KEYS = [
   "located_samples"
 ];
 
+const AUDIO_WINDOW_FIELDS = [
+  "window_id", "started_at_ms", "duration_ms",
+  "low_energy", "mid_energy", "high_energy",
+  "low_delta", "mid_delta", "high_delta",
+  "auditory_roughness_score"
+];
+const GPS_SAMPLE_FIELDS = [
+  "sample_id", "captured_at_ms", "latitude", "longitude",
+  "accuracy_meters", "speed_mps"
+];
+const LOCATED_SAMPLE_FIELDS = [
+  "window_id", "gps_sample_id", "gps_captured_at_ms", "location_status",
+  "latitude", "longitude", "auditory_roughness_score", "color"
+];
+const BASELINE_FIELDS = [
+  "moving_duration_seconds", "low_median", "mid_median", "high_median",
+  "energy_floor_min", "effective_floor"
+];
+const EFFECTIVE_FLOOR_FIELDS = ["low", "mid", "high"];
+
+function pick(source, fields) {
+  const result = {};
+  for (const field of fields) {
+    result[field] = source ? source[field] : undefined;
+  }
+  return result;
+}
+
+function projectAudioWindow(window) {
+  return pick(window, AUDIO_WINDOW_FIELDS);
+}
+
+function projectGpsSample(sample) {
+  return pick(sample, GPS_SAMPLE_FIELDS);
+}
+
+function projectLocatedSample(sample) {
+  return pick(sample, LOCATED_SAMPLE_FIELDS);
+}
+
+function projectBaseline(baseline) {
+  const projected = pick(baseline, BASELINE_FIELDS);
+  projected.effective_floor = pick(baseline ? baseline.effective_floor : undefined, EFFECTIVE_FLOOR_FIELDS);
+  return projected;
+}
+
 function buildSession(input) {
   return {
     session_id: input.session_id,
@@ -20,11 +66,34 @@ function buildSession(input) {
     calibration_status: input.calibration_status,
     score_formula_version: SCORE_FORMULA_VERSION,
     user_agent: input.user_agent || null,
-    baseline: input.baseline,
-    audio_windows: input.audio_windows || [],
-    gps_samples: input.gps_samples || [],
-    located_samples: input.located_samples || []
+    baseline: projectBaseline(input.baseline),
+    audio_windows: (input.audio_windows || []).map(projectAudioWindow),
+    gps_samples: (input.gps_samples || []).map(projectGpsSample),
+    located_samples: (input.located_samples || []).map(projectLocatedSample)
   };
+}
+
+function hasRawAudioKey(value, seen) {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  seen = seen || new Set();
+  if (seen.has(value)) {
+    return false;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.some((item) => hasRawAudioKey(item, seen));
+  }
+  for (const key of Object.keys(value)) {
+    if (key === "raw_audio") {
+      return true;
+    }
+    if (hasRawAudioKey(value[key], seen)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function validateSession(session) {
@@ -34,7 +103,11 @@ function validateSession(session) {
       errors.push(`missing required field: ${key}`);
     }
   }
-  if (session.score_formula_version && session.score_formula_version !== SCORE_FORMULA_VERSION) {
+  if (
+    session.score_formula_version !== undefined &&
+    session.score_formula_version !== null &&
+    session.score_formula_version !== SCORE_FORMULA_VERSION
+  ) {
     errors.push(`unexpected score_formula_version: ${session.score_formula_version}`);
   }
   for (const arrayKey of ["audio_windows", "gps_samples", "located_samples"]) {
@@ -42,7 +115,7 @@ function validateSession(session) {
       errors.push(`${arrayKey} must be an array`);
     }
   }
-  if (JSON.stringify(session).includes("raw_audio")) {
+  if (hasRawAudioKey(session)) {
     errors.push("raw_audio must never be present in an export");
   }
   if (!["complete", "incomplete"].includes(session.calibration_status)) {

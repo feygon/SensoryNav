@@ -44,4 +44,46 @@ const leak = validateSession(leaked);
 assert.strictEqual(leak.valid, false);
 assert.ok(leak.errors.some((e) => e.includes("raw_audio")));
 
+// A raw_audio field on an input audio window is stripped by buildSession's projection.
+const sessionWithRawAudioInput = buildSession({
+  session_id: "s1",
+  created_at_ms: 1000,
+  calibration_status: "complete",
+  baseline: {
+    moving_duration_seconds: 30,
+    low_median: 1, mid_median: 1, high_median: 1,
+    energy_floor_min: 1e-6,
+    effective_floor: { low: 1, mid: 1, high: 1 }
+  },
+  audio_windows: [
+    { window_id: "w1", started_at_ms: 1000, duration_ms: 1000, low_energy: 1, mid_energy: 1, high_energy: 1, low_delta: 0, mid_delta: 0, high_delta: 0, auditory_roughness_score: 0, raw_audio: [0.1, 0.2] }
+  ],
+  gps_samples: [],
+  located_samples: [],
+  user_agent: "test-agent"
+});
+assert.ok(!JSON.stringify(sessionWithRawAudioInput).includes("raw_audio"));
+assert.strictEqual(validateSession(sessionWithRawAudioInput).valid, true);
+
+// Invalid calibration_status is rejected.
+const invalidCalibration = JSON.parse(JSON.stringify(session));
+invalidCalibration.calibration_status = "bogus";
+const calibrationResult = validateSession(invalidCalibration);
+assert.strictEqual(calibrationResult.valid, false);
+assert.ok(calibrationResult.errors.some((e) => e.includes("calibration_status")));
+
+// Non-array audio_windows is rejected.
+const nonArrayAudioWindows = JSON.parse(JSON.stringify(session));
+nonArrayAudioWindows.audio_windows = "oops";
+const audioWindowsResult = validateSession(nonArrayAudioWindows);
+assert.strictEqual(audioWindowsResult.valid, false);
+assert.ok(audioWindowsResult.errors.some((e) => e.includes("audio_windows")));
+
+// Empty-string score_formula_version is rejected (falsy-but-present value).
+const emptyFormulaVersion = JSON.parse(JSON.stringify(session));
+emptyFormulaVersion.score_formula_version = "";
+const formulaVersionResult = validateSession(emptyFormulaVersion);
+assert.strictEqual(formulaVersionResult.valid, false);
+assert.ok(formulaVersionResult.errors.some((e) => e.includes("score_formula_version")));
+
 console.log("session-export tests passed");
