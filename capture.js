@@ -3,6 +3,33 @@
   "use strict";
   const core = window.SensoryNavCore;
 
+  // Mic processing-off request — recorded into the sidecar verbatim so the
+  // capture can be checked against the device's actually-applied settings.
+  // Single source of truth: the getUserMedia constraints AND the manifest's
+  // audio_settings_requested share this object, so they can never drift apart.
+  const REQUESTED_AUDIO = Object.freeze({
+    autoGainControl: false,
+    noiseSuppression: false,
+    echoCancellation: false
+  });
+
+  // Tuning constants, named and gathered here rather than scattered as bare
+  // magic numbers through the handlers.
+  const CONFIG = Object.freeze({
+    vuScale: 4,              // maps worklet RMS to the 0..1 level bar
+    gpsTimeoutMs: 30000,     // watchPosition: max wait per fix
+    gpsMaximumAgeMs: 0,      // never accept a cached fix — we want live motion
+    objectUrlRevokeMs: 1000  // delay before revoking a finished download URL
+  });
+
+  // All warning-banner copy in one place. (The output sites stay where their
+  // events happen; only the text is centralized.)
+  const WARNINGS = Object.freeze({
+    processingOn: "Warning: this device did not honor processing-off. Captures may be gain-normalized.",
+    backgrounded: "Warning: app backgrounded — capture is paused/at risk. Return to the page.",
+    noGps: "Warning: this pass captured no GPS fixes."
+  });
+
   const state = {
     name: "idle",
     frames: [],
@@ -74,7 +101,7 @@
     if (!window.isSecureContext) {
       throw new Error("Insecure context — open over HTTPS.");
     }
-    const constraints = { audio: { autoGainControl: false, noiseSuppression: false, echoCancellation: false } };
+    const constraints = { audio: REQUESTED_AUDIO };
     state.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
     state.appliedSettings = state.mediaStream.getAudioTracks()[0].getSettings();
     warnIfProcessingOn(state.appliedSettings);
@@ -83,9 +110,7 @@
 
   function warnIfProcessingOn(applied) {
     const on = applied.autoGainControl || applied.noiseSuppression || applied.echoCancellation;
-    ui.warning.textContent = on
-      ? "Warning: this device did not honor processing-off. Captures may be gain-normalized."
-      : "";
+    ui.warning.textContent = on ? WARNINGS.processingOn : "";
   }
 
   async function startRecording() {
@@ -119,7 +144,7 @@
     }
     state.frames.push(frame);
     state.totalSamples += frame.length;
-    ui.level.value = Math.min(1, rms * 4); // simple VU scaling
+    ui.level.value = Math.min(1, rms * CONFIG.vuScale); // simple VU scaling
   }
 
   function startGpsWatch() {
@@ -131,7 +156,7 @@
           (position.coords.speed == null ? "?" : position.coords.speed.toFixed(1)) + " m/s";
       },
       (err) => { ui.gps.textContent = "GPS error: " + err.message; },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      { enableHighAccuracy: true, maximumAge: CONFIG.gpsMaximumAgeMs, timeout: CONFIG.gpsTimeoutMs }
     );
   }
 
@@ -157,7 +182,7 @@
     if (state.name !== "recording") { return; }
     if (document.hidden) {
       transition("foreground_lost");
-      ui.warning.textContent = "Warning: app backgrounded — capture is paused/at risk. Return to the page.";
+      ui.warning.textContent = WARNINGS.backgrounded;
     } else if (state.wakeLock === null) {
       acquireWakeLock();
     }
@@ -184,14 +209,14 @@
       partial: reason !== null,
       truncation_reason: reason,
       notes: ui.notes.value,
-      audio_settings_requested: { autoGainControl: false, noiseSuppression: false, echoCancellation: false },
+      audio_settings_requested: REQUESTED_AUDIO,
       audio_settings_applied: state.appliedSettings,
       user_agent: navigator.userAgent,
       gps_samples: state.gpsSamples,
       observed_fix_hz: core.observedFixHz(state.gpsSamples)
     });
     if (state.gpsSamples.length === 0) {
-      ui.warning.textContent = "Warning: this pass captured no GPS fixes.";
+      ui.warning.textContent = WARNINGS.noGps;
     }
     downloadBlob(new Blob([wav], { type: "audio/wav" }), wavName);
     downloadBlob(new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }), label + ".json");
@@ -219,7 +244,7 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), CONFIG.objectUrlRevokeMs);
   }
 
   function hhmmss(date) {
