@@ -11,6 +11,7 @@
     gpsSamples: [],
     gpsCounter: 0,
     recordingStartMs: 0,
+    passTimestamp: "",
     audioFirstFrameMs: 0,
     audioContext: null,
     workletNode: null,
@@ -54,11 +55,18 @@
     if (!transition("start")) { return; }
     try {
       await requestStreams();
-      transition("granted");
-      await startRecording();
     } catch (err) {
       showError(err);
       transition("denied");
+      return;
+    }
+    transition("granted");
+    try {
+      await startRecording();
+    } catch (err) {
+      showError(err);
+      stopStreams();
+      transition("stream_lost");
     }
   }
 
@@ -82,6 +90,7 @@
 
   async function startRecording() {
     state.recordingStartMs = Date.now();
+    state.passTimestamp = hhmmss(new Date());
     state.frames = [];
     state.totalSamples = 0;
     state.gpsSamples = [];
@@ -154,7 +163,7 @@
 
   function finalizeAndExport(reason) {
     stopStreams();
-    const label = (ui.label.value || state.baseLabel) + "-" + hhmmss(new Date());
+    const label = (ui.label.value || state.baseLabel) + "-" + state.passTimestamp;
     const wavName = label + ".wav";
     const wav = core.encodeWav(state.frames, state.totalSamples, state.sampleRate);
     const manifest = core.buildManifest({
