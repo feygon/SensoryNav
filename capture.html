@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SensoryNav Capture</title>
+  <link rel="stylesheet" href="styles.css?v=0.2.5">
+  <script src="theme.js?v=0.2.5"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site"><a href="index.html">Home</a></nav>
+  <h1>Capture</h1>
+  <p id="status" aria-live="polite">State: idle</p>
+  <p id="warning" class="warning" aria-live="assertive"></p>
+
+  <label for="label">Pass base name</label>
+  <input id="label" type="text" value="johnson-creek-pass-1">
+  <label for="notes">Pre-drive notes</label>
+  <input id="notes" type="text" placeholder="dry, ~35mph">
+
+  <div class="controls">
+    <button id="start" type="button">Start recording</button>
+    <button id="stop" type="button" disabled>Stop recording</button>
+  </div>
+
+  <p>Audio level</p>
+  <progress id="level" max="1" value="0"></progress>
+  <p id="gps" aria-live="polite">GPS: acquiring…</p>
+
+  <!-- Pure modules first (attach to window.SensoryNavCore), then the orchestrator. -->
+  <script src="recorder/wav-encoder.js"></script>
+  <script src="recorder/gps-track.js"></script>
+  <script src="recorder/capture-state.js"></script>
+  <script src="recorder/capture-manifest.js"></script>
+  <script src="capture.js"></script>
+</body>
+</html>
