@@ -11,7 +11,7 @@ const TRANSITIONS = {
 
 function nextState(current, event) {
   const row = TRANSITIONS[current];
-  if (!row || !(event in row)) {
+  if (!row || !Object.prototype.hasOwnProperty.call(row, event)) {
     return null;
   }
   return row[event];

@@ -16,4 +16,11 @@ assert.strictEqual(nextState("idle", "stop"), null);
 assert.strictEqual(nextState("recording", "start"), null);
 assert.strictEqual(nextState("stopped", "stream_lost"), null);
 
+// Inherited Object.prototype keys are NOT valid events.
+assert.strictEqual(nextState("idle", "toString"), null);
+assert.strictEqual(nextState("idle", "constructor"), null);
+assert.strictEqual(nextState("idle", "hasOwnProperty"), null);
+// Unknown current state returns null.
+assert.strictEqual(nextState("bogus", "start"), null);
+
 console.log("capture-state tests passed");
