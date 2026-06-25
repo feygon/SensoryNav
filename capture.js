@@ -94,6 +94,7 @@
     state.frames = [];
     state.totalSamples = 0;
     state.gpsSamples = [];
+    state.gpsCounter = 0;
     state.audioFirstFrameMs = 0;
 
     state.audioContext = new AudioContext();
@@ -138,6 +139,7 @@
     try {
       if ("wakeLock" in navigator) {
         state.wakeLock = await navigator.wakeLock.request("screen");
+        state.wakeLock.addEventListener("release", () => { state.wakeLock = null; });
       }
     } catch (err) {
       // Non-fatal; screen may dim.
@@ -145,13 +147,19 @@
   }
 
   function releaseWakeLock() {
-    if (state.wakeLock) { state.wakeLock.release(); state.wakeLock = null; }
+    if (state.wakeLock) {
+      state.wakeLock.release().catch(() => {});
+      state.wakeLock = null;
+    }
   }
 
   function onVisibility() {
-    if (document.hidden && state.name === "recording") {
+    if (state.name !== "recording") { return; }
+    if (document.hidden) {
       transition("foreground_lost");
       ui.warning.textContent = "Warning: app backgrounded — capture is paused/at risk. Return to the page.";
+    } else if (state.wakeLock === null) {
+      acquireWakeLock();
     }
   }
 
