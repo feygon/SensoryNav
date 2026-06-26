@@ -31,6 +31,10 @@ function buildManifest(input) {
   };
 }
 
-const exported = { buildManifest, SCHEMA };
-if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
-if (typeof window !== "undefined") { window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, exported); }
+// Block-scope `exported` so multiple recorder modules loaded as classic
+// <script> tags in one global scope don't collide (each `const exported`).
+{
+  const exported = { buildManifest, SCHEMA };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof window !== "undefined") { window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, exported); }
+}

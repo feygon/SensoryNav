@@ -26,6 +26,10 @@ function observedFixHz(samples) {
   return (samples.length - 1) / seconds;
 }
 
-const exported = { normalizeFix, observedFixHz };
-if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
-if (typeof window !== "undefined") { window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, exported); }
+// Block-scope `exported` so multiple recorder modules loaded as classic
+// <script> tags in one global scope don't collide (each `const exported`).
+{
+  const exported = { normalizeFix, observedFixHz };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof window !== "undefined") { window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, exported); }
+}
