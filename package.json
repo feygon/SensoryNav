@@ -4,6 +4,6 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js && node tests/theme.test.js && node tests/constants.test.js && node tests/cvd-scale.test.js && node tests/audio-scoring.test.js && node tests/calibration.test.js && node tests/sample-pairing.test.js && node tests/session-export.test.js && node tests/fixtures.test.js && node tests/privacy-leak.test.js && node tests/wav-encoder.test.js && node tests/gps-track.test.js && node tests/capture-state.test.js && node tests/capture-manifest.test.js && node tests/browser-scope.test.js && node tests/wav-decoder.test.js"
+    "test": "node tests/waitlist-store.test.js && node tests/waitlist-client.test.js && node tests/waitlist-server.test.js && node tests/theme.test.js && node tests/constants.test.js && node tests/cvd-scale.test.js && node tests/audio-scoring.test.js && node tests/calibration.test.js && node tests/sample-pairing.test.js && node tests/session-export.test.js && node tests/fixtures.test.js && node tests/privacy-leak.test.js && node tests/wav-encoder.test.js && node tests/gps-track.test.js && node tests/capture-state.test.js && node tests/capture-manifest.test.js && node tests/browser-scope.test.js && node tests/wav-decoder.test.js && node tests/fft.test.js"
   }
 }
