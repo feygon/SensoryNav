@@ -105,6 +105,7 @@ WAV bytes
 - `started_at_ms = audio_first_frame_ms + windowIndex · WINDOW_DURATION_MS`.
 - A frame belongs to `windowIndex = floor(frameCenterSample / sampleRate)`.
 - RMS / clip statistics for window `i` are computed over raw samples in `[i·sampleRate, (i+1)·sampleRate)` (the trailing window uses whatever samples remain).
+- **Boundary handling (reviewed, negligible):** a frame straddling a one-second boundary is counted whole in the window its center falls in. With ~46 frames averaged per window this is ≤ ~2 %, and the 50 % overlap further softens it — the adjacent overlapping frame, centered just past the boundary, carries the same boundary-region energy into the next window (overlap *reduces* the edge effect rather than enlarging it). Note that band energies are partitioned by **frame center** while RMS/clip are partitioned by **exact sample range**; this is a deliberate, same-order-negligible difference — band energy is inherently frame-quantized (no sub-frame FFT), RMS is sample-exact — not an inconsistency.
 
 ---
 
