@@ -9,10 +9,11 @@ function loadPass(wavPath, sidecarPath) {
   const sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
   const decoded = decodeWav(bytes);
   const warnings = [];
-  if (sidecar.sample_rate !== undefined && sidecar.sample_rate !== decoded.sampleRate) {
-    warnings.push(
-      `sample_rate mismatch: WAV ${decoded.sampleRate} vs sidecar ${sidecar.sample_rate}`
-    );
+  const sidecarRate = sidecar.audio && sidecar.audio.sample_rate !== undefined
+    ? sidecar.audio.sample_rate
+    : sidecar.sample_rate;
+  if (sidecarRate !== undefined && sidecarRate !== decoded.sampleRate) {
+    warnings.push(`sample_rate mismatch: WAV ${decoded.sampleRate} vs sidecar ${sidecarRate}`);
   }
   const windows = framesToWindows(decoded.samples, decoded.sampleRate, sidecar.audio_first_frame_ms);
   return { windows, sampleRate: decoded.sampleRate, warnings };

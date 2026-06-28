@@ -7,7 +7,7 @@ const FFT_SIZE = CONSTANTS.FFT_SIZE;                 // 2048
 const HOP = FFT_SIZE / 2;                            // 1024
 const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS; // 1000
 const ENERGY_FLOOR_MIN = CONSTANTS.ENERGY_FLOOR_MIN;     // 1e-6
-const CLIP_THRESHOLD = 0.999;
+const CLIP_THRESHOLD = 0.999; // just below the ±1.0 decode ceiling so full-scale samples count as clipped
 const NEAR_FLOOR_K = 10;
 const PARTIAL_MIN_COVERAGE_S = 0.5;
 

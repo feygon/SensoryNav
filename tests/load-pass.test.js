@@ -14,7 +14,7 @@ try {
   const wp = path.join(dir, "p.wav");
   const sp = path.join(dir, "p.json");
   fs.writeFileSync(wp, Buffer.from(wavBytes));
-  fs.writeFileSync(sp, JSON.stringify({ sample_rate: 44100, audio_first_frame_ms: 5000 }));
+  fs.writeFileSync(sp, JSON.stringify({ audio: { sample_rate: 44100 }, audio_first_frame_ms: 5000 }));
   const res = loadPass(wp, sp);
   assert.ok(res.warnings.length > 0, "expected a sample_rate mismatch warning");
   assert.ok(res.warnings[0].includes("mismatch"));
