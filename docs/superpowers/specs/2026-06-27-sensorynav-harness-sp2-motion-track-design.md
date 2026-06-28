@@ -1,6 +1,6 @@
 # SensoryNav Ingestion Harness — SP2: Speed & Motion Track — Design Spec
 
-**Status:** Draft for review (brainstorming output; not yet through the Requirements Rubric gate).
+**Status:** READY — passed the Requirements Rubric gate (R1 = 40/45 → R2 = 44/45; no critical/high/open should-fix). Cleared for `writing-plans`.
 **Date:** 2026-06-27
 **Scope:** SP2 only. SP1 (audio front-end) is built and merged; SP3 (scorer) is deferred and described here only as the consumer.
 
@@ -38,12 +38,14 @@ Velocity in a car is the integral of acceleration, so the true motion is intrins
 
 **Non-functional:** vanilla JS, **no dependencies**, Node `assert` tests, node-only (`module.exports`). Offline batch — no real-time budget; N ≈ 100–300 fixes per pass, the whole pipeline is `O(N)` and runs in milliseconds. Refactored into small, independently-tested modules with the linear-algebra and filter math documented inline.
 
+**Function size (NFR-1):** each function targets **≤ ~100 lines**, with **300 lines a hard block**. `smooth` MUST decompose into `forwardFilter(points, sigmaA)` and `rtsBackward(filtered)`; `buildMotionTrack` MUST delegate per-window work to the named helpers `windowMotion` / `classifyWindow` / `confidenceFromCov` (§4.1, §6.2), so no function approaches the block limit.
+
 ---
 
 ## 3. Inputs
 
 1. **`gps_samples`** (from the sidecar): array of `{ sample_id, captured_at_ms, latitude, longitude, speed_mps, accuracy_meters }`. `captured_at_ms` is epoch ms; `speed_mps` may be `null`.
-2. **`windowStarts`**: the ordered list of SP1 window `started_at_ms` values (one per 1 s window). SP2 emits exactly one record per entry, in the same order. (A thin caller derives this from SP1's output; SP2 itself takes the array.)
+2. **`windows`**: SP1's window records, each providing at least `{ window_id, started_at_ms }` (SP1's output satisfies this directly). SP2 emits exactly one record per entry, in the same order, **carrying through each input `window_id`** — so the SP2↔SP1 join cannot silently desync if SP1 ever renumbers or drops a window. (The SP3 orchestrator passes SP1's window array straight in.)
 
 SP2's units are pure functions over these in-memory inputs. Disk reading lives in the SP3 orchestrator / existing `load-pass.js`.
 
@@ -68,10 +70,10 @@ New directory `harness/motion/` (sibling to `harness/audio/`).
 
 - **`harness/motion/kalman-smoother.js`** — constant-velocity 4-state `[x, y, vx, vy]`:
   - `smooth(points, sigmaA)` → array (aligned to `points`) of RTS-smoothed `{ t, s: [x,y,vx,vy], P: 4×4 }`. Requires `points.length ≥ 2`; throws otherwise (caller guards — see §7).
-  - `evaluateAt(smoothed, t, sigmaA)` → `{ s: [x,y,vx,vy], P: 4×4 }` for an arbitrary time `t`, by propagating the immediately-preceding smoothed state forward by `dt = (t − t_prev)/1000` s through `F(dt)`, inflating covariance by `Q(dt)`. (For `t` before the first / after the last fix, extrapolate from the nearest end; such windows are typically gap-flagged in §6.)
+  - `evaluateAt(smoothed, t, sigmaA)` → `{ s: [x,y,vx,vy], P: 4×4 }` for an arbitrary time `t`. Pick the **nearest** smoothed fix as the anchor and propagate by `dt = (t − t_anchor)/1000` s through `F(dt)`, inflating covariance by **`Q(|dt|)`**. **`dt` may be negative** (window center before the anchor): `F(dt)` is valid for negative `dt`, but `Q` MUST be built from `|dt|` — a negative `dt` would make the `dt³/3` variance terms negative, i.e. a non-PSD covariance. For `t` before the first fix the anchor is fix 0 (negative `dt`); after the last, fix N−1. Such out-of-range windows are normally `gap_unscored` in §6 anyway.
 
 - **`harness/motion/motion-track.js`** — orchestrator:
-  - `buildMotionTrack(gpsSamples, windowStarts, params)` → array of per-window records (§6). Owns the gap policy, stationary handling, Doppler cross-check, and the variance→confidence mapping. Decomposed into helpers (`windowMotion`, `classifyWindow`, `confidenceFromCov`).
+  - `buildMotionTrack(gpsSamples, windows, params)` → array of per-window records (§6), one per input window, carrying through each `window_id`. Owns the gap policy, stationary handling, Doppler cross-check, and the variance→confidence mapping, delegating to `windowMotion(window, smoothed, fixes, params)` → record, `classifyWindow(...)` → `{ confidence, source, flags, heading }` (the §6.2 canonical pipeline), and `confidenceFromCov(velTraceVar, params)`.
 
 ### 4.2 The filter math (constant-velocity, white-noise acceleration)
 
@@ -93,7 +95,7 @@ H = [[1,0,0,0],
                               [0, acc²]]     (acc = that fix's accuracy_meters)
 ```
 
-- **Forward filter** (initialize at fix 0: position = measurement, velocity = 0, large initial velocity covariance): standard predict (`s⁻ = F s`, `P⁻ = F P Fᵀ + Q`) then update (`S = H P⁻ Hᵀ + R` is 2×2, inverted in closed form; `K = P⁻ Hᵀ S⁻¹`; `s = s⁻ + K(z − H s⁻)`; `P = (I − K H) P⁻`). Store filtered and one-step-predicted `(s, P)` per fix.
+- **Forward filter** (initialize at fix 0: position = the measurement with `P[x][x] = P[y][y] = acc₀²`; velocity = 0 with `P[vx][vx] = P[vy][vy] = INIT_VEL_VAR = (50 m/s)²` so the first few fixes set the velocity; off-diagonals 0): standard predict (`s⁻ = F s`, `P⁻ = F P Fᵀ + Q`) then update (`S = H P⁻ Hᵀ + R` is 2×2, inverted in closed form; `K = P⁻ Hᵀ S⁻¹`; `s = s⁻ + K(z − H s⁻)`; `P = (I − K H) P⁻`). Store filtered and one-step-predicted `(s, P)` per fix.
 - **RTS backward pass** for `k = N−2 … 0`: `C = P_k^filt · F(dt_{k+1})ᵀ · (P_{k+1}^pred)⁻¹` (computed via `solve`), `s_k^sm = s_k^filt + C(s_{k+1}^sm − s_{k+1}^pred)`, `P_k^sm = P_k^filt + C(P_{k+1}^sm − P_{k+1}^pred)Cᵀ`.
 
 ---
@@ -103,29 +105,29 @@ H = [[1,0,0,0],
 ```
 gps_samples ──► projectFixes ──► points [{t,x,y,acc,speedNative}], lat0, lon0
 points ──► smooth(points, sigmaA) ──► smoothed [{t, s:[x,y,vx,vy], P}]
-for each windowStart in windowStarts:
-    t = windowStart + WINDOW_DURATION_MS/2          # window center
+for each window in windows:
+    t = window.started_at_ms + WINDOW_DURATION_MS/2  # window center
     {s, P} = evaluateAt(smoothed, t, sigmaA)
     vEast = s[2]; vNorth = s[3]
     speed = sqrt(vEast² + vNorth²)
     heading = speed < STATIONARY_SPEED ? null : bearingDeg(vEast, vNorth)
     velTraceVar = P[2][2] + P[3][3]                 # velocity uncertainty proxy
-    confidence, source, flags = classifyWindow(t, speed, velTraceVar, nearest fix, in-window Doppler)
-    emit record
+    {confidence, source, flags, heading} = classifyWindow(...)   # §6.2 canonical order
+    emit { window_id: window.window_id, started_at_ms: window.started_at_ms, ... }
 ```
 
-`WINDOW_DURATION_MS` (1000) is imported from `recorder/constants.js` so SP2's window-center math matches SP1.
+`WINDOW_DURATION_MS` (1000) comes from the existing core via `const { CONSTANTS } = require("../../recorder/constants"); const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS;` (the same access SP1's `harness/audio/audio-windows.js` uses), so SP2's window-center math matches SP1.
 
 ---
 
 ## 6. Output — the SP2 → SP3 interface
 
-`buildMotionTrack` returns an array, one record per `windowStarts` entry, same order:
+`buildMotionTrack` returns an array, one record per input `windows` entry, same order:
 
 ```js
 {
-  window_id:        "w0",        // matches SP1's window_id by index ("w" + i)
-  started_at_ms:    Number,      // = windowStarts[i]
+  window_id:        String,      // carried through from the input window (SP1's window_id)
+  started_at_ms:    Number,      // = the input window's started_at_ms
   speed_mps:        Number,      // smoothed speed magnitude (>= 0)
   heading_deg:      Number|null, // compass bearing [0,360); null when stationary
   speed_confidence: Number,      // [0,1], continuous; 0 = unscored
@@ -143,13 +145,25 @@ for each windowStart in windowStarts:
   - `nearestGapS > GAP_MAX_S` → `speed_confidence = 0`, `source = "interpolated"`, `flags += "gap_unscored"` (SP3 excludes it). Speed/heading are still the best estimate but must not be trusted.
   - `GAP_INTERP_S < nearestGapS ≤ GAP_MAX_S` → `flags += "interpolated"`, `speed_confidence = min(base, INTERP_CAP)`, `source = "interpolated"`.
   - else → normal.
-- **Low accuracy:** nearest fix `acc > ACC_FLAG_M` → `flags += "low_accuracy"` (and base confidence is already lower because `R` was large there).
-- **Stationary:** `speed < STATIONARY_SPEED` → `heading_deg = null`, `flags += "stationary"`.
-- **`speed_source` precedence (highest wins):** `insufficient_fixes` (the §7 < 2-fix case) → `interpolated` (any gap tier — `interpolated` or `gap_unscored`) → otherwise a *normal* window's source is decided by the Doppler cross-check below. Stationary affects `heading_deg`/flags only, never `source`.
-- **Doppler cross-check** (normal windows only — skipped when `interpolated`/`gap_unscored`; requires an `inWindowDoppler`; `relErr = |native − derived| / max(native, derived, 0.1)`):
-  - `relErr ≤ DOPPLER_TOL` → `source = "native_crosschecked"`.
-  - `relErr > DOPPLER_TOL` → `source = "derived"`, `flags += "doppler_mismatch"`, `speed_confidence ·= DOPPLER_PENALTY`.
-  - no `inWindowDoppler` → `source = "derived"`.
+- **Low accuracy:** for a normal or `interpolated` window, nearest fix `acc > ACC_FLAG_M` → `flags += "low_accuracy"`. **Suppressed on `gap_unscored`** windows — the nearest fix is too far away for its accuracy to mean anything.
+- **Stationary:** `speed < STATIONARY_SPEED` → `heading_deg = null`, `flags += "stationary"` (never touches `source` or `confidence`).
+- **Doppler cross-check** (`relErr = |native − derived| / max(native, derived, 0.1)`): see the canonical order in §6.2.
+
+### 6.2 Classification pipeline (canonical order)
+
+`classifyWindow` applies these steps in **exactly** this order, making the result deterministic. `nearestGapS` = seconds from the window center to the nearest fix; `inWindowDoppler` = a fix with non-null `speed_mps` whose `captured_at_ms ∈ [started_at_ms, started_at_ms + WINDOW_DURATION_MS)`.
+
+1. **Base:** `confidence = confidenceFromCov(velTraceVar)`; `source` undecided; `flags = []`; `heading = bearingDeg(vEast, vNorth)`.
+2. **Gap tier:**
+   - `nearestGapS > GAP_MAX_S` → `confidence = 0`; `source = "interpolated"`; `flags += "gap_unscored"`.
+   - else if `nearestGapS > GAP_INTERP_S` → `confidence = min(confidence, INTERP_CAP)`; `source = "interpolated"`; `flags += "interpolated"`.
+   - else → leave `confidence`; `source` still undecided.
+3. **Low accuracy:** if NOT `gap_unscored` and nearest fix `acc > ACC_FLAG_M` → `flags += "low_accuracy"` (no further `confidence` change beyond the already-larger `R`).
+4. **Stationary:** if `speed < STATIONARY_SPEED` → `heading = null`; `flags += "stationary"`.
+5. **Doppler** (only when `source` is still undecided): with an `inWindowDoppler`, `relErr ≤ DOPPLER_TOL` → `source = "native_crosschecked"`; `relErr > DOPPLER_TOL` → `source = "derived"`, `flags += "doppler_mismatch"`, `confidence ·= DOPPLER_PENALTY`. No `inWindowDoppler` → `source = "derived"`.
+6. **Final clamp:** `confidence = max(0, min(1, confidence))`.
+
+The `< 2`-fix path (§7) bypasses this pipeline with fixed values.
 
 ---
 
@@ -161,7 +175,7 @@ for each windowStart in windowStarts:
 - **Duplicate/zero-`dt` fixes** (the 25 ms-apart real case is fine; exact duplicates would make `Q(dt)`/`F(dt)` degenerate): if `dt ≤ 0` between consecutive fixes after sorting by `captured_at_ms`, the later duplicate is dropped before filtering.
 - **Fixes are sorted by `captured_at_ms`** before projection/filtering (the sidecar order is not assumed monotonic).
 - `solve` throws on a singular matrix; this should not occur with `R ≻ 0` and `Q ≻ 0` for `dt > 0`, but the throw is a loud guard rather than silent `NaN`.
-- The array length always equals `windowStarts.length`, in the same order (contiguous, parallel to SP1).
+- The array length always equals `windows.length`, in the same order, each record carrying its input `window_id` (contiguous, parallel to SP1).
 
 ---
 
@@ -178,6 +192,7 @@ for each windowStart in windowStarts:
 | `DOPPLER_TOL` | 0.25 | Relative speed disagreement above which `doppler_mismatch` fires. |
 | `DOPPLER_PENALTY` | 0.5 | Confidence multiplier on a Doppler mismatch. |
 | `VAR_SCALE` | 1.0 (m/s)² | Normalizer in the confidence map; tune so typical good windows land near 0.8–0.95. |
+| `INIT_VEL_VAR` | (50 m/s)² | Initial velocity-state variance at fix 0 (large, so early fixes set the velocity). |
 
 `params` overrides any of these; omitted keys take the default.
 
@@ -188,24 +203,27 @@ for each windowStart in windowStarts:
 - **`linalg`**: `matMul`/`transpose`/`identity` on known small matrices; `solve` recovers `X` for a known `A·X = B` (incl. a 4×4) within tolerance; `solve` on a singular matrix throws.
 - **`geo-project`**: a fix at `lat0,lon0` projects to ~`(0,0)`; a known eastward/northward offset projects to the expected meters (e.g., 0.001° lat ≈ 111.3 m north) within 1 %; `bearingDeg(1,0)=90` (East), `bearingDeg(0,1)=0` (North), `bearingDeg(-1,0)=270` (West).
 - **`kalman-smoother`**:
-  - A **straight constant-velocity synthetic track** (known `v`, exact positions, small `acc`) → recovered `vx,vy` within a tight tolerance at interior fixes.
-  - **Accuracy weighting:** a single fix with `acc = 200` displaced sideways between many `acc = 5` fixes on a line → its smoothed position is pulled back onto the line (residual ≪ the displacement).
+  - A **straight constant-velocity synthetic track** (`v = (12, 0) m/s`, exact positions at 1 Hz, `acc = 5`, `SIGMA_A = 2.0`) → recovered `vx` and `vy` each within **±0.05 m/s** of truth at interior fixes.
+  - **Accuracy weighting:** one fix with `acc = 200` displaced **20 m** sideways between many `acc = 5` fixes on a straight line → its smoothed lateral residual is **< 2 m** (< 10 % of the displacement).
+  - **`evaluateAt`:** on the CV track, evaluating **0.5 s after** a fix advances position by `≈ v·0.5` (within **±0.5 m**) at the same velocity (±0.05 m/s); evaluating **before the first fix** (negative `dt`) returns a finite state whose velocity variance is strictly larger than at fix 0 (confirms `Q(|dt|)` stays PSD).
   - `smooth` throws on `< 2` points.
 - **`motion-track`** (the spec-critical behaviors):
-  - Constant-velocity track sampled at 1 Hz, windows every 1 s → `speed_mps` ≈ true speed, `heading_deg` ≈ true bearing, `speed_source` reflects Doppler presence.
-  - **Gap test:** fixes with a 16 s hole → windows whose center is `> GAP_MAX_S` from any fix come back `speed_confidence: 0` + `gap_unscored`; windows in `(GAP_INTERP_S, GAP_MAX_S]` get `interpolated` + capped confidence.
+  - Constant-velocity track sampled at 1 Hz, windows every 1 s → `speed_mps` within **±0.1 m/s** of true speed, `heading_deg` within **±2°** of true bearing.
+  - **Gap test:** fixes with a 16 s hole → windows whose center is `> GAP_MAX_S` from any fix return `speed_confidence: 0` + `gap_unscored` and **no** `low_accuracy` flag (suppressed); windows in `(GAP_INTERP_S, GAP_MAX_S]` get `interpolated` + `speed_confidence ≤ INTERP_CAP`.
   - **Stationary test:** near-zero-motion fixes → `heading_deg: null` + `stationary`.
-  - **Confidence monotonicity:** sparser / lower-accuracy fixes yield lower `speed_confidence` than dense / high-accuracy ones for comparable windows.
-  - **Doppler cross-check:** an in-window native speed agreeing → `native_crosschecked`; a disagreeing one → `doppler_mismatch` + reduced confidence.
-  - **`< 2` fixes:** all windows `insufficient_fixes`, confidence 0, length == `windowStarts.length`.
-  - **Real-pass smoke test:** run over `data/johnson-creek-pass-1-163508` GPS (3 fixes, ~0.12 Hz, `speed_mps` all null, accuracy 100–212 m) → array length == SP1's window count (25), and (given the sparsity) most windows are `interpolated`/`gap_unscored` — documents that a desktop-grade GPS pass is correctly judged low-trust. **This validates mechanics + the trust model, not real motion.**
+  - **Confidence monotonicity:** a window served by dense `acc = 5` fixes has strictly greater `speed_confidence` than a comparable window served by sparse `acc = 100` fixes.
+  - **Doppler cross-check:** an in-window native speed within `DOPPLER_TOL` → `native_crosschecked`; one beyond → `derived` + `doppler_mismatch` + `speed_confidence` reduced by `DOPPLER_PENALTY`.
+  - **Combined interaction (pins §6.2 order):** an `interpolated` window that also has a far/low-accuracy nearest fix keeps `source = "interpolated"` (Doppler does NOT relabel it); a `stationary` window with an in-window Doppler of `0.0` gives `relErr = 0` → `native_crosschecked` with `heading_deg: null`.
+  - **Fix dedup/sort:** fixes supplied out of `captured_at_ms` order, including a pair with identical timestamps, are sorted and the zero-`dt` duplicate dropped before filtering (assert no throw, sane track).
+  - **`< 2` fixes:** all windows `insufficient_fixes`, confidence 0, `heading_deg: null`, length == `windows.length`.
+  - **Real-pass smoke test:** load the sidecar `data/johnson-creek-pass-1-163508.json` and pass its `gps_samples` (3 fixes, ~0.12 Hz, `speed_mps` all null, accuracy 100/136/212 m) with a 25-entry window grid (`w0…w24`, matching SP1) → array length 25, every record carries the right `window_id`, and given the sparsity most windows are `interpolated`/`gap_unscored`. **Validates mechanics + the trust model, not real motion.**
 
 ---
 
 ## 10. Success criteria
 
 - **SC-1** — Given `gps_samples` + a window grid, SP2 returns exactly one record per window, same order, each with the §6 fields.
-- **SC-2** — On a synthetic constant-velocity track, recovered speed and heading match truth within tolerance.
+- **SC-2** — On a synthetic constant-velocity track, recovered speed is within ±0.1 m/s and heading within ±2° of truth.
 - **SC-3** — Accuracy weighting works: a low-accuracy outlier fix is pulled toward the trajectory defined by its accurate neighbors.
 - **SC-4** — The trust model is correct: gaps → `interpolated`/`gap_unscored`, stationary → null heading, Doppler agreement/disagreement → the right source/flag, and confidence is monotonic in fix quality.
 - **SC-5** — `< 2` fixes and the real (sparse, null-speed) pass are handled without error and correctly judged low-trust.
@@ -213,9 +231,30 @@ for each windowStart in windowStarts:
 
 ---
 
-## 11. Open questions for review
+## 11. Requirements and traceability
 
-1. **Confidence map shape:** `1/(1 + var/VAR_SCALE)` is simple and monotonic; an exponential `exp(−var/VAR_SCALE)` is an alternative. Acceptable to ship the rational form and tune `VAR_SCALE` against real data?
-2. **`evaluateAt` propagation:** v1 propagates forward from the *preceding* smoothed state (covariance-inflated). A two-sided smoother-interpolation would be marginally more accurate mid-interval but more code. Forward-propagation acceptable, given gap windows are flagged anyway?
-3. **Gap tiers (3 s / 10 s):** do these match your sense of when a coast becomes untrustworthy at typical road speeds?
-4. **Heading at low speed:** `STATIONARY_SPEED = 0.5 m/s` (~1.1 mph) as the null-heading threshold — reasonable, or do you want it tied to GPS accuracy instead?
+| ID | Requirement | Defined | Verified by |
+|---|---|---|---|
+| FR-1 | Equirectangular projection around mean `lat0/lon0`; `point` carries `t,x,y,acc,speedNative` | §4.1 | `geo-project` offset test |
+| FR-2 | `bearingDeg` compass convention (0°=N, 90°=E), range `[0,360)` | §4.1 | `geo-project` bearing test |
+| FR-3 | Forward CV-Kalman with F/Q/H/R per §4.2, `R = acc²` weighting, fixed init covariances | §4.2 | `kalman-smoother` CV-track test |
+| FR-4 | RTS backward smoother (gain via `solve`) | §4.2 | `kalman-smoother` accuracy-weighting test |
+| FR-5 | `evaluateAt` propagation, `Q(|dt|)`, negative-`dt` handling | §4.1 | `kalman-smoother` evaluateAt test |
+| FR-6 | Per-window record schema (§6 fields); one per input window, same order, carried `window_id` | §6 | `motion-track` CV / `<2`-fix / smoke tests |
+| FR-7 | Confidence map `1/(1+var/VAR_SCALE)`, monotonic, clamped `[0,1]` | §6.1, §6.2 | `motion-track` monotonicity test |
+| FR-8 | Gap policy (3 tiers: normal / interpolated / gap_unscored) | §6.1, §6.2 | `motion-track` gap test |
+| FR-9 | Stationary policy (heading null + flag) | §6.1, §6.2 | `motion-track` stationary test |
+| FR-10 | Doppler cross-check + `speed_source` precedence + final clamp (canonical §6.2 order) | §6.2 | `motion-track` Doppler + combined-interaction tests |
+| FR-11 | `< 2` fixes → all `insufficient_fixes`, length == `windows.length` | §7 | `motion-track` `<2`-fix test |
+| FR-12 | Fixes sorted by `captured_at_ms`; zero-`dt` duplicates dropped | §7 | `motion-track` dedup/sort test |
+| FR-13 | `linalg.solve` correctness + singular-matrix throw | §4.1 | `linalg` solve test |
+| NFR-1 | Function size ≤~100 / 300 hard; `smooth`→`forwardFilter`+`rtsBackward`; `buildMotionTrack` delegates | §2 | review |
+| NFR-2 | No dependencies; node-only `module.exports`; `O(N)` | §2 | `npm test` |
+| NFR-3 | `WINDOW_DURATION_MS` from `recorder/constants.js` (`CONSTANTS` access) | §5 | window-center alignment in CV test |
+
+### 11.1 Resolved decisions (formerly open questions)
+
+1. **Confidence map:** ship the rational `1/(1 + var/VAR_SCALE)` (§6.1) and calibrate `VAR_SCALE` against real captures. *(Resolved: ship-and-calibrate; exponential variant not needed.)*
+2. **`evaluateAt`:** `|dt|`-propagation from the nearest smoothed state (§4.1); two-sided smoother-interpolation deferred as unnecessary — mid-interval windows are ≤ 0.5 s from a fix, and gap windows are flagged regardless. *(Resolved.)*
+3. **Gap tiers:** `GAP_INTERP_S = 3 s`, `GAP_MAX_S = 10 s` (§8) — flagged tunables to calibrate. *(Resolved: ship-and-calibrate.)*
+4. **Stationary threshold:** `STATIONARY_SPEED = 0.5 m/s`, a fixed scalar (§8); not tied to GPS accuracy in v1. *(Resolved.)*
