@@ -209,14 +209,14 @@ The `< 2`-fix path (§7) bypasses this pipeline with fixed values.
   - `smooth` throws on `< 2` points.
 - **`motion-track`** (the spec-critical behaviors):
   - Constant-velocity track sampled at 1 Hz, windows every 1 s → `speed_mps` within **±0.1 m/s** of true speed, `heading_deg` within **±2°** of true bearing.
-  - **Gap test:** fixes with a 16 s hole → windows whose center is `> GAP_MAX_S` from any fix return `speed_confidence: 0` + `gap_unscored` and **no** `low_accuracy` flag (suppressed); windows in `(GAP_INTERP_S, GAP_MAX_S]` get `interpolated` + `speed_confidence ≤ INTERP_CAP`.
+  - **Gap test:** a `gap_unscored` window must be `> GAP_MAX_S` from its **nearest** fix, i.e. inside a hole wider than `2·GAP_MAX_S` (~20 s). Use a **26 s hole** → a window at its center (`~13 s` from each side) returns `speed_confidence: 0` + `gap_unscored` and **no** `low_accuracy` flag (suppressed); a window `~3.5 s` from a fix gets `interpolated` + `speed_confidence ≤ INTERP_CAP`. (A 16 s hole's midpoint is only ~8 s from each fix → `interpolated`, **not** `gap_unscored`.)
   - **Stationary test:** near-zero-motion fixes → `heading_deg: null` + `stationary`.
   - **Confidence monotonicity:** a window served by dense `acc = 5` fixes has strictly greater `speed_confidence` than a comparable window served by sparse `acc = 100` fixes.
   - **Doppler cross-check:** an in-window native speed within `DOPPLER_TOL` → `native_crosschecked`; one beyond → `derived` + `doppler_mismatch` + `speed_confidence` reduced by `DOPPLER_PENALTY`.
   - **Combined interaction (pins §6.2 order):** an `interpolated` window that also has a far/low-accuracy nearest fix keeps `source = "interpolated"` (Doppler does NOT relabel it); a `stationary` window with an in-window Doppler of `0.0` gives `relErr = 0` → `native_crosschecked` with `heading_deg: null`.
   - **Fix dedup/sort:** fixes supplied out of `captured_at_ms` order, including a pair with identical timestamps, are sorted and the zero-`dt` duplicate dropped before filtering (assert no throw, sane track).
   - **`< 2` fixes:** all windows `insufficient_fixes`, confidence 0, `heading_deg: null`, length == `windows.length`.
-  - **Real-pass smoke test:** load the sidecar `data/johnson-creek-pass-1-163508.json` and pass its `gps_samples` (3 fixes, ~0.12 Hz, `speed_mps` all null, accuracy 100/136/212 m) with a 25-entry window grid (`w0…w24`, matching SP1) → array length 25, every record carries the right `window_id`, and given the sparsity most windows are `interpolated`/`gap_unscored`. **Validates mechanics + the trust model, not real motion.**
+  - **Real-pass smoke test:** load the sidecar `data/johnson-creek-pass-1-163508.json` and pass its `gps_samples` (3 fixes, ~0.12 Hz, `speed_mps` all null, accuracy 100/136/212 m) with a 25-entry window grid (`w0…w24`, matching SP1) → array length 25, every record carries the right `window_id`, and given the sparsity most windows are `interpolated` (the real 16 s gap's midpoint is ~8 s from each fix, so those windows are `interpolated`, not `gap_unscored`). **Validates mechanics + the trust model, not real motion.**
 
 ---
 
