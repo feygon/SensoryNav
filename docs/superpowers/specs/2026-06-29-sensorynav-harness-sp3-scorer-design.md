@@ -1,6 +1,6 @@
 # SensoryNav Harness SP3 — Research Scorer & Felt-Validation (Design)
 
-**Status:** DRAFT — pending Requirements Rubric gate.
+**Status:** READY — passed the Requirements Rubric gate (R1 = 38/45 → R2 = 43/45; 0 critical/high, no open should-fix). Cleared for `writing-plans`.
 **Date:** 2026-06-29
 **Scope:** SP3 only. SP1 (audio front-end) and SP2 (motion track) are built and merged. Road-condition classification (SP4), the SP1 phase-2 feature extension, cross-pass aggregation, and the on-device app scorer are all **deferred** and appear here only as downstream context.
 
@@ -52,6 +52,8 @@ Multiple passes of the same vehicle feed the **baseline fit** (§4.3). Disk read
 ### 3.1 Data-volume precondition (speed-conditioning is data-hungry; global fallback is the default until then)
 
 Speed-conditioning only engages where a 2 m/s speed bin reaches `MIN_BIN_SAMPLES` (20) reliable windows pooled across passes. A meaningful speed-conditioned curve for a band needs roughly **≥ 2 qualifying bins**, i.e. ~40+ reliable windows spread across ≥ 2 speed ranges — realistically **several passes**, not one. The one real pass on hand (`data/johnson-creek-pass-1-163508.json`, 3 GPS fixes / ~25 windows) will **not** populate bins; its baseline collapses to the **global floor** (§4.3 step 5, 0-bin case), and many windows carry low `speed_confidence` → low reliability. This is expected and not a failure: the design degrades gracefully to the speed-independent null model and **reports** that it did (`baseline_meta`, §4.3). SC-3 (§7) exercises exactly this global-fallback path and asserts it; the speed-conditioned path is exercised on **synthetic** multi-pass fixtures with enough samples to qualify bins.
+
+**Single-vehicle batch precondition:** the baseline is pooled **per vehicle**, so a `run-scorer.js` batch (and the `validateBatch` re-pooled aggregate, §4.8) is **single-vehicle** — every pass in one run is the same car/tires. Multi-vehicle pooling (different baselines per vehicle) is out of scope here and belongs to the deferred cross-vehicle aggregation work (§12).
 
 ---
 
@@ -173,9 +175,9 @@ magnitude     = roughness_raw                                                   
 `report.js` (pure, returns strings):
 - `scoredWindowsJson(scored)` and `sessionSummaryJson(batchSummary)` — canonical machine outputs. The session summary includes the per-band `baseline_meta` (§4.3: `qualified_bins`, `fell_back_to_global`, `n_samples`) so a reader can tell whether speed-conditioning engaged or collapsed to global, plus exclusion counts by reason.
 - `scoredWindowsCsv(scored)` — flat CSV of the scored records.
-- `inspectionHtml(scored, summary)` — a **self-contained** dark-mode static page (inline CSS, no network/deps): summary panel, then the per-window table with roughness/reliability color-coded and the felt overlay column. Colors: bg `#1a1a1a`, text `#dcdcdc`, containers mid-gray (`#555`/`#666`); no pure-white surfaces.
+- `inspectionHtml(scored, summary)` — a **self-contained** dark-mode static page (inline CSS, no network/deps): summary panel, then the per-window table with roughness/reliability color-coded and the felt overlay column. Colors: bg `#1a1a1a`, text `#dcdcdc`, containers mid-gray (`#555`/`#666`); no pure-white surfaces. The table is **unpaginated** — intended for research passes (≤ ~a few thousand windows); no large-scale rendering bound is in scope. A pass with **every window excluded** (`reliability == 0`) renders a clear "no scorable windows" panel instead of an empty table.
 
-`run-scorer.js` (the only IO module): load each pass (`load-pass.js` + SP1 `framesToWindows` + SP2 `buildMotionTrack`), build pooled baseline samples (first pass), `fitBaseline`, `scorePass` each, `validateBatch`, and write the four artifacts to an output directory.
+`run-scorer.js` (the only IO module): load each pass (`load-pass.js` + SP1 `framesToWindows` + SP2 `buildMotionTrack`), build pooled baseline samples (first pass), `fitBaseline`, `scorePass` each, `validateBatch`, and write the four artifacts to an output directory. `run-scorer.js` also **tallies the summary's exclusion-by-reason counts** from the scored records' `reliability`/`reliability_flags` (the scored records are the single source; `score-pass.js` does not aggregate).
 
 **Output-artifact privacy:** the scored JSON/CSV/HTML embed per-window `lat`/`lon` — a precise location trace. `run-scorer.js` writes them to a **git-ignored** output directory (default `out/score/`, added to `.gitignore`); these artifacts are **never committed**, consistent with the local-research-exception posture (research captures and their geolocated derivatives stay local, off any product/export path).
 
