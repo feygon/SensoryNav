@@ -49,6 +49,10 @@ Per pass, all on a shared **epoch-ms** clock:
 
 Multiple passes of the same vehicle feed the **baseline fit** (§4.3). Disk reading lives in `run-scorer.js` / existing `load-pass.js`; every other module is a pure function over in-memory inputs.
 
+### 3.1 Data-volume precondition (speed-conditioning is data-hungry; global fallback is the default until then)
+
+Speed-conditioning only engages where a 2 m/s speed bin reaches `MIN_BIN_SAMPLES` (20) reliable windows pooled across passes. A meaningful speed-conditioned curve for a band needs roughly **≥ 2 qualifying bins**, i.e. ~40+ reliable windows spread across ≥ 2 speed ranges — realistically **several passes**, not one. The one real pass on hand (`data/johnson-creek-pass-1-163508.json`, 3 GPS fixes / ~25 windows) will **not** populate bins; its baseline collapses to the **global floor** (§4.3 step 5, 0-bin case), and many windows carry low `speed_confidence` → low reliability. This is expected and not a failure: the design degrades gracefully to the speed-independent null model and **reports** that it did (`baseline_meta`, §4.3). SC-3 (§7) exercises exactly this global-fallback path and asserts it; the speed-conditioned path is exercised on **synthetic** multi-pass fixtures with enough samples to qualify bins.
+
 ---
 
 ## 4. Components
@@ -62,7 +66,7 @@ lat = lat0 + y / (R_EARTH * DEG)
 lon = lon0 + x / (R_EARTH * DEG * cos(lat0 * DEG))
 ```
 
-with `R_EARTH = 6371000`, `DEG = π/180` (the exact inverse of `projectFixes`). The new record keys are `lat`, `lon`, placed after `started_at_ms`. The `< 2 fixes` branch sets `lat = null`, `lon = null` (no track). SP2's existing tests are updated; a new test asserts the projection round-trips (`projectFixes` then invert ≈ identity to < 1e-6° ).
+reusing the exported `R_EARTH` from `geo-project.js` and `DEG = π/180` (the exact inverse of `projectFixes`; do not re-declare `R_EARTH`). **Threading:** `buildMotionTrack` already destructures `projectFixes(...)`; change it to keep `{ points, lat0, lon0 }` and pass `lat0, lon0` into `windowMotion`, which computes `lat`/`lon` and emits them in the record after `started_at_ms`. There are **two emit sites** and both must set the keys: (1) `windowMotion` (normal path) emits the inverted lat/lon; (2) the existing `< 2 fixes` early-return branch emits `lat = null, lon = null` (no track). SP2's existing tests are updated for the new keys; a new test asserts the projection round-trips (`projectFixes` then invert ≈ identity to < 1e-6°).
 
 ### 4.2 `metrics.js` — pure statistics kit
 
@@ -70,9 +74,9 @@ Row-major-free, plain numbers. Functions:
 - `quantile(values, q)` and `weightedQuantile(values, weights, q)` — linear-interpolated percentile; `q ∈ [0,1]`. Empty input throws `"quantile: empty"`.
 - `spearman(xs, ys)` and `weightedSpearman(xs, ys, weights)` — rank correlation; ties via average ranks; returns a number in `[-1,1]`, or `NaN` if `n < 2` or zero variance (caller reports `n/a`).
 - `rocAuc(scores, labels, weights)` — weighted area under ROC; `labels` are `0/1`; returns `NaN` if labels are all-one or all-zero.
-- `precisionRecall(scores, labels, threshold, weights)` → `{ precision, recall, f1 }` (weighted); `bestF1Threshold(scores, labels, weights)` → `{ threshold, f1 }` scanning candidate thresholds (the distinct score values).
+- `precisionRecall(scores, labels, threshold, weights)` → `{ precision, recall, f1 }` (weighted); `bestF1Threshold(scores, labels, weights)` → `{ threshold, f1 }` scanning candidate thresholds (the distinct values present in `scores`).
 
-All weighted variants treat a missing `weights` as all-ones.
+All weighted variants treat a missing `weights` as all-ones. **All ranking/threshold metrics operate on the continuous `roughness_raw` (§4.6), never the rounded integer `roughness`** — this is what makes ROC and Spearman tie-free.
 
 ### 4.3 `baseline.js` — speed-conditioned lower-envelope floor
 
@@ -81,11 +85,16 @@ All weighted variants treat a missing `weights` as all-ones.
 Algorithm, **per band** independently (`low`, `mid`, `high`):
 1. Drop samples with `reliability == 0`.
 2. Bucket by speed into `SPEED_BIN_MPS`-wide bins (default `2.0`), bin index `floor(speed / SPEED_BIN_MPS)`.
-3. For each bin with `≥ MIN_BIN_SAMPLES` (default `20`) effective samples, compute `weightedQuantile(energy, reliability, FLOOR_Q)` (default `FLOOR_Q = 0.10`). The bin's representative speed is its center.
-4. Bins below `MIN_BIN_SAMPLES` merge into the nearest qualifying bin (widen until satisfied); if no bin qualifies, fall back to the **global** floor for that band.
-5. `floorAt(baseline, band, speed)` linearly interpolates between adjacent qualifying bin centers; speeds beyond the end centers **clamp** to the end bin's value.
+3. For each bin with `≥ MIN_BIN_SAMPLES` (default `20`) effective samples, compute `weightedQuantile(energy, reliability, FLOOR_Q)` (default `FLOOR_Q = 0.10`). A bin's **representative speed** is the reliability-weighted mean speed of its pooled samples (not the nominal bin center — so merged/uneven bins sit where their data actually is).
+4. Bins below `MIN_BIN_SAMPLES` merge into the nearest neighbor bin (widen until satisfied); if no bin qualifies, fall back to the **global** floor for that band.
+5. `floorAt(baseline, band, speed)`:
+   - **≥ 2 qualifying bins** → linearly interpolate between adjacent bins' representative speeds; speeds beyond the end representatives **clamp** to the end bin's value.
+   - **exactly 1 qualifying bin** → constant floor (that bin's quantile) at all speeds. This is the expected real-data case until enough passes accumulate (§3.1).
+   - **0 qualifying bins** → returns the global floor for the band.
 
-`fitBaseline` also always computes the **null-model** global floor per band: `weightedQuantile(all reliable energies for the band, reliabilities, FLOOR_Q)`, exposed as `globalFloorAt(baseline, band)` (speed-independent). The floor is never allowed below `EPS_FLOOR = ENERGY_FLOOR_MIN` (1e-6) to avoid divide-by-tiny in the residual.
+**Precondition / honesty (see §3.1):** on a single short pass almost no 2 m/s bin reaches 20 samples, so the speed-conditioned curve degenerates to a constant or to the global floor. `fitBaseline` therefore returns `baseline_meta` per band: `{ qualified_bins, fell_back_to_global (bool), n_samples }`, which `run-scorer.js` surfaces in the session summary so a reader can see whether speed-conditioning actually engaged or collapsed to global.
+
+`fitBaseline` also always computes the **null-model** global floor per band: `weightedQuantile(all reliable energies for the band, reliabilities, FLOOR_Q)`, exposed as `globalFloorAt(baseline, band)` (speed-independent). Both the speed-conditioned floor and the global floor are clamped up to `EPS_FLOOR = ENERGY_FLOOR_MIN` (1e-6) to avoid divide-by-tiny in the residual. If a band has **no** reliable samples at all, `fitBaseline` throws `"baseline: no reliable samples for band <b>"` (§6).
 
 ### 4.4 `felt.js` — felt-truth ingestion & time join
 
@@ -101,7 +110,7 @@ Algorithm, **per band** independently (`low`, `mid`, `high`):
 ```
 - `loadFelt(obj)` validates: `schema === "sensorynav-felt-v1"`, `spans`/`events` arrays present (either may be empty), every `magnitude` a finite number, every span `end_ms > start_ms`. Violations throw `"felt: <reason>"`. `category` is preserved but unused by SP3.
 - `mapFeltToWindows(felt, windows)` → for each window `{ window_id }` returns `{ felt_present, felt_magnitude }`:
-  - A window's time interval is `[started_at_ms, started_at_ms + WINDOW_DURATION_MS)`.
+  - A window's time interval is `[started_at_ms, started_at_ms + (duration_ms || WINDOW_DURATION_MS))` — the window's actual `duration_ms` so the (rare) trailing partial window isn't over-counted; full windows are `WINDOW_DURATION_MS`.
   - **Present** if any span overlaps the interval (`span.start_ms < windowEnd && span.end_ms > windowStart`) or any event falls inside it (`windowStart ≤ at_ms < windowEnd`).
   - `felt_magnitude` = the **max** magnitude among all overlapping spans/events (most severe wins); `null` when not present.
 
@@ -121,46 +130,54 @@ reliability = speedFactor * clipFactor * frameFactor * floorGate
 
 ### 4.6 `roughness.js` — residual, detection, magnitude
 
-Reuses the recorder's existing `roughnessScore(windowEnergies, baseline)` (`recorder/audio-scoring.js`), which computes a weighted per-band residual above an `effective_floor` and scales to `[0,100]` via `CONSTANTS.WEIGHTS` and `CONSTANTS.SCORE_SCALE`. SP3 supplies a **speed-conditioned** floor per window:
+The recorder's existing `roughnessScore(windowEnergies, baseline)` (`recorder/audio-scoring.js`) computes a weighted per-band residual above an `effective_floor` and returns `clamp(round(raw · SCORE_SCALE), 0, 100)` — a **rounded integer**. Rounding is fine for human display but would flood the magnitude Spearman (FR-11) with ties and make detection flip in unit steps. So:
+
+**Recorder change (single residual implementation, honoring NFR-2):** refactor `recorder/audio-scoring.js` to expose `roughnessScoreRaw(windowEnergies, baseline)` returning the **continuous, unrounded** `clamp(raw · SCORE_SCALE, 0, 100)`; `roughnessScore` becomes `Math.round(roughnessScoreRaw(...))`. The integer output of `roughnessScore` is byte-for-byte unchanged (verified by the existing recorder test), so this is a non-breaking extraction, not a re-implementation.
+
+SP3 supplies a **speed-conditioned** floor per window and ranks on the continuous value:
 
 ```
 floor = { low:  floorAt(baseline,"low",  speed),
           mid:  floorAt(baseline,"mid",  speed),
           high: floorAt(baseline,"high", speed) }
-roughness = roughnessScore({low,mid,high}, { effective_floor: floor })   // 0..100
-detected  = roughness > DETECT_TAU                                       // DETECT_TAU default 12
-magnitude = roughness                                                    // the spike size IS the roughness scalar
+roughness_raw = roughnessScoreRaw({low,mid,high}, { effective_floor: floor })  // continuous 0..100
+roughness     = Math.round(roughness_raw)                                       // integer, DISPLAY only
+detected      = roughness_raw > DETECT_TAU                                       // threshold on continuous; DETECT_TAU default 12
+magnitude     = roughness_raw                                                    // the spike size IS the continuous scalar
 ```
-`scoreWindowRoughness(sp1win, speed, baseline, params)` returns `{ roughness, detected, magnitude }`. A `useNullFloor` option swaps `floorAt` for `globalFloorAt` to produce `roughness_null` for the §4.8 A/B.
+`scoreWindowRoughness(sp1win, speed, baseline, params)` returns `{ roughness_raw, roughness, detected, magnitude }`. A `useNullFloor` option swaps `floorAt` for `globalFloorAt` to produce `roughness_null` (continuous) for the §4.8 A/B. **Every metric in §4.8 ranks/thresholds on `roughness_raw` / `roughness_null`; the integer `roughness` appears only in the HTML/CSV display.**
 
 ### 4.7 `score-pass.js` — per-pass orchestrator
 
 `scorePass(sp1windows, sp2track, baseline, felt, params)` → array, one record per window, joined by `window_id`:
 ```
 { window_id, started_at_ms, lat, lon, speed_mps, heading_deg,
-  roughness, detected, magnitude, roughness_null,
+  roughness_raw, roughness, detected, magnitude, roughness_null,
   reliability, reliability_flags, speed_source, sp2_flags,
   felt_present, felt_magnitude }
 ```
-`felt` may be `null` → `felt_present = false`, `felt_magnitude = null` for all. Order and length match `sp1windows`. If an SP1 window has no matching SP2 `window_id`, that is a hard error `"scorePass: window_id <id> missing in SP2 track"` (the join must not silently desync).
+`felt` may be `null` → `felt_present = false`, `felt_magnitude = null` for all. Order and length match `sp1windows`. `scorePass` **retains every window, including `reliability == 0` rows** — they appear in the scored JSON/CSV/HTML for inspection (you want to *see* the dead/clipped windows); only the baseline fit (§4.3) and validation (§4.8) drop them. If an SP1 window has no matching SP2 `window_id`, that is a hard error `"scorePass: window_id <id> missing in SP2 track"` (the join must not silently desync).
 
 ### 4.8 `validate.js` — felt-vs-computed agreement
 
-`validatePass(scored, params)` → a summary object. Excludes windows with `reliability == 0`. Over the remaining windows:
-- **Presence:** `rocAuc(roughness, felt_present, reliability)`; `precisionRecall(roughness, felt_present, DETECT_TAU, reliability)`; `bestF1Threshold(...)`. Same metrics on `roughness_null` → `auc_null`, etc.
-- **Magnitude:** over felt-present windows only, `weightedSpearman(roughness, felt_magnitude, reliability)`; and on `roughness_null` → `spearman_null`.
+`validatePass(scored, params)` → a summary object. Excludes windows with `reliability == 0`. Over the remaining windows (ranking/thresholding on the **continuous** `roughness_raw`):
+- **Presence:** `rocAuc(roughness_raw, felt_present, reliability)`; `precisionRecall(roughness_raw, felt_present, DETECT_TAU, reliability)` at the **fixed operating point** `DETECT_TAU`; and `bestF1Threshold(roughness_raw, felt_present, reliability)` reported **alongside** as the data-driven optimum (so you can see if `DETECT_TAU` wants tuning). `DETECT_TAU` is the frozen headline operating point; `bestF1` is reference-only and does not replace it.
+- **Null-model A/B:** the identical presence metrics on `roughness_null` → `auc_null`, `pr_null` (**using the same `DETECT_TAU`** so the A/B is apples-to-apples), and `bestF1` on `roughness_null`.
+- **Magnitude:** over felt-present windows only, `weightedSpearman(roughness_raw, felt_magnitude, reliability)`; and on `roughness_null` → `spearman_null`.
 - **Edge cases (reported, not hidden):** no felt (all `felt_present` false) → presence/magnitude `n/a` with reason `"no_felt"`; all-present or all-absent → AUC `n/a` reason `"degenerate_labels"`; `< MIN_SPEARMAN_N` (default `5`) felt-present windows → spearman flagged `unstable` with its `n`.
 
-`validateBatch(perPassScored[], params)` → per-pass summaries + an aggregate over pooled windows.
+`validateBatch(perPassScored[], params)` → per-pass summaries **plus** an aggregate computed by **re-pooling all passes' (non-zero-reliability) windows into one set and recomputing the metrics over that pool** (not by averaging per-pass numbers — pooled and averaged metrics differ, and pooled is the correct cross-pass picture).
 
 ### 4.9 `report.js` & `run-scorer.js` — outputs & IO
 
 `report.js` (pure, returns strings):
-- `scoredWindowsJson(scored)` and `sessionSummaryJson(batchSummary)` — canonical machine outputs.
+- `scoredWindowsJson(scored)` and `sessionSummaryJson(batchSummary)` — canonical machine outputs. The session summary includes the per-band `baseline_meta` (§4.3: `qualified_bins`, `fell_back_to_global`, `n_samples`) so a reader can tell whether speed-conditioning engaged or collapsed to global, plus exclusion counts by reason.
 - `scoredWindowsCsv(scored)` — flat CSV of the scored records.
 - `inspectionHtml(scored, summary)` — a **self-contained** dark-mode static page (inline CSS, no network/deps): summary panel, then the per-window table with roughness/reliability color-coded and the felt overlay column. Colors: bg `#1a1a1a`, text `#dcdcdc`, containers mid-gray (`#555`/`#666`); no pure-white surfaces.
 
 `run-scorer.js` (the only IO module): load each pass (`load-pass.js` + SP1 `framesToWindows` + SP2 `buildMotionTrack`), build pooled baseline samples (first pass), `fitBaseline`, `scorePass` each, `validateBatch`, and write the four artifacts to an output directory.
+
+**Output-artifact privacy:** the scored JSON/CSV/HTML embed per-window `lat`/`lon` — a precise location trace. `run-scorer.js` writes them to a **git-ignored** output directory (default `out/score/`, added to `.gitignore`); these artifacts are **never committed**, consistent with the local-research-exception posture (research captures and their geolocated derivatives stay local, off any product/export path).
 
 ---
 
@@ -196,16 +213,17 @@ per window: floor=f(speed) ─> roughnessScore ─> {roughness, detected, magnit
 ## 7. Testing
 
 Node `assert` scripts, chained into `npm test` (same convention as SP1/SP2). Each file ends `console.log("<name> tests passed")`.
+- `audio-scoring` (recorder) — `roughnessScore` output is **byte-for-byte unchanged** after the `roughnessScoreRaw` extraction (existing recorder test still passes); `roughnessScoreRaw` returns the continuous pre-round value and `Math.round` of it equals `roughnessScore`.
 - `metrics` — weighted `quantile` (known answer), `spearman` (ρ = 1 monotone, ρ = −1 antitone, ties), `rocAuc` (perfect = 1, random ≈ 0.5, degenerate = NaN), `precisionRecall` + `bestF1Threshold`.
-- `felt` — `loadFelt` accept/reject cases; span-overlap and event-in-window boundaries; max-magnitude wins.
-- `baseline` — synthetic pooled samples → known per-bin floor; reliability weighting moves the floor; sparse-bin merge; global null model; `EPS_FLOOR` clamp.
-- `reliability` — each factor independently; the four flags; hard `near_floor` zero; product.
-- `roughness` — matches `roughnessScore` under a known speed-conditioned floor; `detected` threshold; null-floor path.
-- `score-pass` — join by `window_id`; missing-window throw; null-felt path; record shape/length.
-- `validate` — synthetic perfect match → AUC = 1, ρ = 1; null-vs-speed-cond delta; the three edge cases (`no_felt`, `degenerate_labels`, `unstable`).
-- `report` — JSON/CSV shape; HTML is self-contained (no `http`/`src=http`), dark palette present.
-- **End-to-end smoke** on the real `data/johnson-creek-pass-1-163508.json` pass (no felt → validation-skipped path) + a tiny synthetic felt file exercising the scored+validated path.
-- **SP2 patch** — `lat`/`lon` round-trip the projection inversion.
+- `felt` — `loadFelt` accept/reject cases; span-overlap and event-in-window boundaries (using each window's `duration_ms`); max-magnitude wins.
+- `baseline` — synthetic multi-pass samples that **qualify ≥ 2 bins** → known interpolated per-bin floor; reliability weighting moves the floor; sparse-bin merge with reliability-weighted representative speed; **single-qualifying-bin → constant floor**; **0-bin → global floor**; `baseline_meta` counts correct; global null model; `EPS_FLOOR` clamp; no-reliable-samples throw.
+- `reliability` — each factor independently; the four flags; hard `near_floor` zero; product; `FULL_FRAMES = 45` known answer.
+- `roughness` — `roughness_raw` continuous + `roughness = round(raw)`; matches `roughnessScoreRaw` under a known speed-conditioned floor; `detected` thresholds on `roughness_raw`; null-floor path.
+- `score-pass` — join by `window_id`; missing-window throw; null-felt path; **`reliability == 0` rows retained** in output; record shape/length.
+- `validate` — synthetic perfect match (continuous `roughness_raw`) → AUC = 1, ρ = 1; null-vs-speed-cond delta; pooled `validateBatch` aggregate re-pools windows (≠ per-pass average); the three edge cases (`no_felt`, `degenerate_labels`, `unstable`).
+- `report` — JSON/CSV shape (incl. `baseline_meta` in summary); HTML is self-contained (no `http`/`src=http`), dark palette present.
+- **End-to-end smoke** on the real `data/johnson-creek-pass-1-163508.json` pass: scores end-to-end, asserts the **global-fallback** path (`baseline_meta.fell_back_to_global == true`, §3.1) and the no-felt validation-skipped path; plus a synthetic **multi-pass** fixture (felt + enough samples) exercising the speed-conditioned + validated path.
+- **SP2 patch** — `lat`/`lon` round-trip the projection inversion; `< 2 fixes` branch emits `lat/lon = null`.
 
 ---
 
@@ -219,7 +237,7 @@ All `params`-overridable:
 | `FLOOR_Q` | `0.10` | lower-envelope quantile |
 | `MIN_BIN_SAMPLES` | `20` | min effective samples per baseline bin before merge |
 | `CLIP_TOL` | `0.02` | clip fraction at which `clipFactor` hits 0 |
-| `FULL_FRAMES` | derived | expected FFT frames in a full window = `floor((samplesPerWindow − FFT_SIZE)/HOP) + 1`; `samplesPerWindow = round(sampleRate·WINDOW_DURATION_MS/1000)`, `HOP = FFT_SIZE/2` |
+| `FULL_FRAMES` | derived (**= 45** at 48 kHz) | expected FFT frames in a full window = `floor((samplesPerWindow − FFT_SIZE)/HOP) + 1`; `samplesPerWindow = round(sampleRate·WINDOW_DURATION_MS/1000)`, `HOP = FFT_SIZE/2`. At `sampleRate 48000`: `samplesPerWindow 48000`, `FULL_FRAMES = floor((48000−2048)/1024)+1 = 45`. NB `framesToWindows` assigns frames by center-sample (`audio-windows.js`), so an interior window can legitimately hold 44–46 frames; `frameFactor`'s `clamp(…,0,1)` caps such windows at 1 (no penalty) and only genuinely short/partial windows score `< 1`. The `reliability` test uses 45 as its known answer. |
 | `DETECT_TAU` | `12` | roughness above which `detected = true` (operating threshold) |
 | `MIN_SPEARMAN_N` | `5` | min felt-present windows before magnitude ρ is trusted |
 | `EPS_FLOOR` | `1e-6` | floor lower clamp (= `ENERGY_FLOOR_MIN`) |
@@ -231,17 +249,17 @@ All `params`-overridable:
 ## 9. Module structure
 
 New `harness/score/` (vanilla JS, Node-only `module.exports`, no dependencies):
-`metrics.js`, `felt.js`, `baseline.js`, `reliability.js`, `roughness.js`, `score-pass.js`, `validate.js`, `report.js`, `run-scorer.js`. Plus the SP2 patch to `harness/motion/motion-track.js`. Tests under `tests/`.
+`metrics.js`, `felt.js`, `baseline.js`, `reliability.js`, `roughness.js`, `score-pass.js`, `validate.js`, `report.js`, `run-scorer.js`. Plus two edits to existing code: the SP2 patch to `harness/motion/motion-track.js` (§4.1) and the `roughnessScoreRaw` extraction in `recorder/audio-scoring.js` (§4.6). Tests under `tests/`.
 
 ---
 
 ## 10. Constraints (global)
 
 - **No dependencies.** Vanilla JS. Node-only modules → plain `module.exports = { ... }`.
-- **Reuse** `recorder/audio-scoring.js` `roughnessScore` and `recorder/constants.js`; do not re-implement the residual or redefine constants.
+- **Reuse** `recorder/audio-scoring.js` and `recorder/constants.js`; the only recorder change is extracting `roughnessScoreRaw` (§4.6) with `roughnessScore` unchanged — do not otherwise re-implement the residual or redefine constants.
 - **Dark-mode** HTML only (bg `#1a1a1a`, text `#dcdcdc`, gray containers; no pure white) per the standing visual-accommodation requirement.
 - **Function size** ~100 lines/function target, 300 hard; decompose orchestrators into the named helpers above.
-- **No raw-audio export path** touched; research captures stay a local exception.
+- **No raw-audio export path** touched; research captures stay a local exception. Scored output artifacts embed `lat`/`lon` and are written to a **git-ignored** dir (`out/score/`), never committed (§4.9).
 
 ---
 
@@ -256,23 +274,29 @@ New `harness/score/` (vanilla JS, Node-only `module.exports`, no dependencies):
 | FR-5 | `sensorynav-felt-v1` load + validation | §4.4 |
 | FR-6 | Felt→window **time** join (span overlap / event-in-window; max magnitude) | §4.4 |
 | FR-7 | Per-window reliability = speed × clip × frame × floorGate, with flags | §4.5 |
-| FR-8 | Roughness via reused `roughnessScore` with speed-conditioned floor; detection; magnitude | §4.6 |
-| FR-9 | Per-pass scored records joined by `window_id`, length == windows, null-felt path | §4.7 |
-| FR-10 | Presence validation (ROC-AUC, P/R/F1@τ, bestF1), reliability-weighted | §4.8 |
-| FR-11 | Magnitude validation (weighted Spearman over felt-present) | §4.8 |
-| FR-12 | Null-model A/B (speed-cond vs global floor) on both presence & magnitude | §4.8 |
+| FR-8 | Roughness via reused residual; **continuous `roughness_raw`** for ranking + integer `roughness` for display; detection on `roughness_raw`; magnitude | §4.6 |
+| FR-8a | `roughnessScoreRaw` extracted in recorder; `roughnessScore` output unchanged | §4.6 |
+| FR-9 | Per-pass scored records joined by `window_id`, length == windows, null-felt path, **zero-reliability rows retained** | §4.7 |
+| FR-10 | Presence validation on `roughness_raw` (ROC-AUC, P/R/F1 at fixed `DETECT_TAU`, bestF1 reference), reliability-weighted | §4.8 |
+| FR-11 | Magnitude validation (weighted Spearman on `roughness_raw` over felt-present) | §4.8 |
+| FR-12 | Null-model A/B (speed-cond vs global floor) on presence & magnitude, **same `DETECT_TAU`** | §4.8 |
 | FR-13 | Edge cases reported as `n/a` + reason (`no_felt`, `degenerate_labels`, `unstable`) | §4.8 |
-| FR-14 | Batch over passes: per-pass + aggregate | §4.8/§4.9 |
-| FR-15 | Outputs: scored JSON, summary JSON, CSV, dark-mode self-contained HTML | §4.9 |
-| FR-16 | IO orchestrator builds pooled baseline then scores/validates/writes | §4.9 |
+| FR-14 | Batch over passes: per-pass + aggregate by **re-pooling windows** (not averaging) | §4.8/§4.9 |
+| FR-15 | Outputs: scored JSON, summary JSON (+ `baseline_meta`), CSV, dark-mode self-contained HTML | §4.9 |
+| FR-16 | IO orchestrator builds pooled baseline then scores/validates/writes to git-ignored dir | §4.9 |
+| FR-17 | `baseline_meta` per band (qualified bins / global-fallback / n) surfaced in summary | §4.3/§4.9 |
+| FR-18 | `floorAt` rules: ≥2 bins interpolate, 1 bin constant, 0 bins global; rep speed = weighted mean | §4.3 |
 | NFR-1 | No dependencies; Node-only `module.exports` | §10 |
-| NFR-2 | Reuse `roughnessScore` + constants | §10 |
+| NFR-2 | Reuse residual (`roughnessScoreRaw`/`roughnessScore`) + constants; no re-implementation | §10 |
 | NFR-3 | Dark-mode HTML only | §10 |
 | NFR-4 | Function-size limits / decomposition | §10 |
 | NFR-5 | Hard throw on SP1↔SP2 `window_id` desync | §4.7/§6 |
-| SC-1 | Synthetic perfect-match pass → AUC = 1, ρ = 1 | §7 |
+| NFR-6 | Geolocated output artifacts git-ignored, never committed | §4.9/§10 |
+| NFR-7 | Data-volume precondition stated; graceful global-fallback when under-data | §3.1 |
+| SC-1 | Synthetic perfect-match pass (continuous ranking) → AUC = 1, ρ = 1 | §7 |
 | SC-2 | Null-vs-speed-conditioned delta computed and reported | §7 |
-| SC-3 | Real johnson-creek pass scores end-to-end (validation-skipped path) | §7 |
+| SC-3 | Real johnson-creek pass scores end-to-end via the **asserted global-fallback** path | §7 |
+| SC-4 | Synthetic multi-pass fixture qualifies ≥2 bins → speed-conditioned + validated path exercised | §7 |
 
 ---
 
