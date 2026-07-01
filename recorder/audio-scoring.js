@@ -43,7 +43,7 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function roughnessScore(windowEnergies, baseline) {
+function roughnessScoreRaw(windowEnergies, baseline) {
   const floor = baseline.effective_floor;
   const delta = (energy, base) => Math.max(0, energy / base - 1);
   const lowDelta = delta(windowEnergies.low, floor.low);
@@ -51,10 +51,14 @@ function roughnessScore(windowEnergies, baseline) {
   const highDelta = delta(windowEnergies.high, floor.high);
   const { low, mid, high } = CONSTANTS.WEIGHTS;
   const raw = low * lowDelta + mid * midDelta + high * highDelta;
-  return clamp(Math.round(raw * CONSTANTS.SCORE_SCALE), 0, 100);
+  return clamp(raw * CONSTANTS.SCORE_SCALE, 0, 100);
 }
 
-const exported = { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequency, roughnessScore };
+function roughnessScore(windowEnergies, baseline) {
+  return Math.round(roughnessScoreRaw(windowEnergies, baseline));
+}
+
+const exported = { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequency, roughnessScore, roughnessScoreRaw };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = exported;
