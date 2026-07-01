@@ -87,6 +87,7 @@ function windowMotion(w, smoothed, fixes, params, lat0, lon0) {
   return {
     window_id: w.window_id,
     started_at_ms: w.started_at_ms,
+    // inverse equirectangular projection: north axis s[1] -> lat, east axis s[0] -> lon (do not swap)
     lat: lat0 + s[1] / (R_EARTH * DEG),
     lon: lon0 + s[0] / (R_EARTH * DEG * Math.cos(lat0 * DEG)),
     speed_mps: speed,
