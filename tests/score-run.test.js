@@ -55,4 +55,16 @@ assert.ok(fs.existsSync(path.join(outDir, "scored-0.csv")));
 assert.ok(fs.existsSync(path.join(outDir, "inspection-0.html")));
 assert.ok(summary.aggregate);
 
+// --- Malformed sidecar guard: missing audio.wav_filename produces a legible error ---
+{
+  const badDir = fs.mkdtempSync(path.join(os.tmpdir(), "sp3-bad-"));
+  const badSidecarPath = path.join(badDir, "bad.json");
+  fs.writeFileSync(badSidecarPath, JSON.stringify({ gps_samples: [] }), "utf8");
+  const badOutDir = fs.mkdtempSync(path.join(os.tmpdir(), "sp3-bad-out-"));
+  assert.throws(
+    () => runScorer({ passFiles: [badSidecarPath], outDir: badOutDir, params: {} }),
+    /missing audio\.wav_filename/
+  );
+}
+
 console.log("score-run tests passed");

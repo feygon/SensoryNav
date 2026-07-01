@@ -35,6 +35,9 @@ function loadPassToWindows(passFile, params) {
   // (resolved relative to the sidecar's own directory). loadPass reads BOTH and returns
   // { windows, sampleRate, warnings } — its `.windows` are the SP1 windows (framesToWindows runs inside).
   const sidecar = JSON.parse(fs.readFileSync(passFile, "utf8"));
+  if (!sidecar.audio || !sidecar.audio.wav_filename) {
+    throw new Error("run-scorer: " + passFile + " sidecar missing audio.wav_filename");
+  }
   const wavPath = path.join(path.dirname(passFile), sidecar.audio.wav_filename);
   const loaded = loadPass(wavPath, passFile);
   const sp1windows = loaded.windows;
