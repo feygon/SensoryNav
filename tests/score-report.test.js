@@ -20,7 +20,7 @@ assert.ok(lines[1].includes("w0"));
 
 const html = inspectionHtml(scored, summary);
 assert.ok(html.includes("#1a1a1a") && html.includes("#dcdcdc")); // dark palette
-assert.ok(!/src\s*=\s*["']https?:/i.test(html));           // self-contained, no network
+assert.ok(!/(?:src|href)\s*=\s*["']https?:/i.test(html), "HTML must not reference external http(s) resources");
 assert.ok(html.includes("w0"));
 
 // empty/fully-excluded → no-scorable-windows panel.

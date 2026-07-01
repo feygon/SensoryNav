@@ -40,7 +40,7 @@ function inspectionHtml(scored, summary) {
   const body = scored.map((r) => {
     const cls = r.reliability === 0 ? ' class="dead"' : "";
     return `<tr${cls}>` + COLS.map((c) => {
-      const v = Array.isArray(r[c]) ? r[c].join("|") : (r[c] === null ? "" : r[c]);
+      const v = Array.isArray(r[c]) ? r[c].join("|") : (r[c] === null || r[c] === undefined ? "" : r[c]);
       return `<td${c === "window_id" ? ' class="id"' : ""}>${esc(v)}</td>`;
     }).join("") + "</tr>";
   }).join("");
