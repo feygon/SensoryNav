@@ -1,7 +1,8 @@
 // harness/motion/motion-track.js
 "use strict";
 const { CONSTANTS } = require("../../recorder/constants");
-const { projectFixes, bearingDeg } = require("./geo-project");
+const { projectFixes, bearingDeg, R_EARTH } = require("./geo-project");
+const DEG = Math.PI / 180;
 const { smooth, evaluateAt } = require("./kalman-smoother");
 
 const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS;
@@ -76,7 +77,7 @@ function classifyWindow(t, startedAtMs, speed, vEast, vNorth, velTraceVar, fixes
   return { confidence, source, flags, heading };
 }
 
-function windowMotion(w, smoothed, fixes, params) {
+function windowMotion(w, smoothed, fixes, params, lat0, lon0) {
   const t = w.started_at_ms + WINDOW_DURATION_MS / 2;
   const { s, P } = evaluateAt(smoothed, t, params.SIGMA_A);
   const vEast = s[2], vNorth = s[3];
@@ -86,6 +87,8 @@ function windowMotion(w, smoothed, fixes, params) {
   return {
     window_id: w.window_id,
     started_at_ms: w.started_at_ms,
+    lat: lat0 + s[1] / (R_EARTH * DEG),
+    lon: lon0 + s[0] / (R_EARTH * DEG * Math.cos(lat0 * DEG)),
     speed_mps: speed,
     heading_deg: c.heading,
     speed_confidence: c.confidence,
@@ -101,6 +104,8 @@ function buildMotionTrack(gpsSamples, windows, params) {
     return windows.map((w) => ({
       window_id: w.window_id,
       started_at_ms: w.started_at_ms,
+      lat: null,
+      lon: null,
       speed_mps: 0,
       heading_deg: null,
       speed_confidence: 0,
@@ -108,9 +113,9 @@ function buildMotionTrack(gpsSamples, windows, params) {
       flags: ["gap_unscored"]
     }));
   }
-  const { points } = projectFixes(fixesRaw);
+  const { points, lat0, lon0 } = projectFixes(fixesRaw);
   const smoothed = smooth(points, p.SIGMA_A);
-  return windows.map((w) => windowMotion(w, smoothed, points, p));
+  return windows.map((w) => windowMotion(w, smoothed, points, p, lat0, lon0));
 }
 
 module.exports = { buildMotionTrack, classifyWindow, confidenceFromCov, sortDedupFixes };
