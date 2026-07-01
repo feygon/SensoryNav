@@ -31,15 +31,14 @@ function fitBand(reliable, band, p) {
     if (buf.length >= p.MIN_BIN_SAMPLES) flush();
   }
   // sub-min speed tail is dropped; global floor covers those speeds
-  buf = [];
   return { points: points.sort((a, b) => a.speed - b.speed), global, meta: { qualified_bins: points.length, fell_back_to_global: points.length === 0, n_samples: reliable.length } };
 }
 
 function fitBaseline(samples, params) {
   const p = Object.assign({}, DEFAULTS, params || {});
+  const reliable = samples.filter((s) => s.reliability > 0);
   const out = {};
   for (const band of BANDS) {
-    const reliable = samples.filter((s) => s.reliability > 0);
     if (!reliable.length) throw new Error("baseline: no reliable samples for band " + band);
     out[band] = fitBand(reliable, band, p);
   }
@@ -58,7 +57,6 @@ function floorAt(baseline, band, speed) {
       return pts[i].floor + frac * (pts[i + 1].floor - pts[i].floor);
     }
   }
-  return pts[pts.length - 1].floor;
 }
 
 function globalFloorAt(baseline, band) { return baseline[band].global; }
