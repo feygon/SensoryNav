@@ -3,3 +3,6 @@
 !.env.example
 .playwright-mcp/
 out/
+
+# Raw research audio captures — large, local dev/research only, never committed.
+data/*.wav
