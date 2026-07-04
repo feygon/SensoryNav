@@ -88,4 +88,4 @@ function framesToWindows(samples, sampleRate, audioFirstFrameMs) {
   return windows;
 }
 
-module.exports = { framesToWindows, windowIndexFor };
+module.exports = { framesToWindows, windowIndexFor, stft };

@@ -41,4 +41,18 @@ assert.strictEqual(globalFloorAt(bz, "low"), 1e-6);
 // No reliable samples → throw.
 assert.throws(() => fitBaseline([{ speed: 5, low: 1, mid: 1, high: 1, reliability: 0 }], {}), /no reliable samples/);
 
+// OVERLAP_TIERS: a wide (span>5 m/s) loud low-speed bin borrows a quiet higher-speed neighbour,
+// dragging its lower-envelope floor DOWN. Off by default => hard-bin floor unchanged.
+const wide = []; for (let i = 0; i < 22; i++) wide.push(mk(0.5 + (6 / 21) * i, 5));   // 0.5..6.5 loud, span 6
+const near = []; for (let i = 0; i < 22; i++) near.push(mk(8 + (2 / 21) * i, 1));      // 8..10 quiet
+const mixed = wide.concat(near);
+const noOv = fitBaseline(mixed, {});
+const ov = fitBaseline(mixed, { OVERLAP_TIERS: [[10, 0.25], [5, 0.50]] });
+assert.ok(floorAt(noOv, "low", 2) > 3, `no-overlap wide bin keeps its own loud floor, got ${floorAt(noOv, "low", 2)}`);
+assert.ok(floorAt(ov, "low", 2) < floorAt(noOv, "low", 2), "50% overlap widens the wide bin into the quiet neighbour, lowering its floor");
+// A narrow bin (span<5) is untouched by the tiers.
+const narrowOnly = []; for (let i = 0; i < 25; i++) narrowOnly.push(mk(5 + i * 0.02, 2)); // 5.0..5.48, span<5
+assert.strictEqual(floorAt(fitBaseline(narrowOnly, { OVERLAP_TIERS: [[10, 0.25], [5, 0.50]] }), "low", 5),
+  floorAt(fitBaseline(narrowOnly, {}), "low", 5), "narrow bin (span<5) unaffected by overlap tiers");
+
 console.log("score-baseline tests passed");
