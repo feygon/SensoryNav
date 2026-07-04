@@ -10,6 +10,13 @@
   src: url("assets/fonts/lion_king.ttf") format("truetype");
 }
 
+/* Declare support for both schemes so the browser's built-in dark mode and
+   native controls (scrollbars, form widgets) render correctly before/without JS.
+   theme.js refines documentElement.style.colorScheme to the resolved theme. */
+:root {
+  color-scheme: light dark;
+}
+
 body {
   font-family: Arial, sans-serif;
   max-width: 900px;
@@ -298,6 +305,46 @@ button {
   border: 1px solid #333;
   background: #eee;
   cursor: pointer;
+}
+
+/* Capture page: control cluster + warning line. */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.warning {
+  color: #b00020;
+}
+
+body.dark-mode .warning,
+html.dark-mode body .warning {
+  color: #ff8a80;
+}
+
+/* Dark treatment for form controls (used by the capture page + waitlist form).
+   .theme-button keeps its own dark rule above via higher (class) specificity. */
+body.dark-mode input,
+html.dark-mode body input {
+  background: #1b1b1b;
+  border-color: #555;
+  color: #eee;
+}
+
+body.dark-mode button,
+html.dark-mode body button {
+  background: #222;
+  border-color: #777;
+  color: #eee;
+}
+
+body.dark-mode button:disabled,
+html.dark-mode body button:disabled {
+  color: #888;
+  border-color: #444;
+  cursor: not-allowed;
 }
 
 @media (max-width: 700px) {

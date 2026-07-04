@@ -2,13 +2,37 @@
   const storageKey = "sensorynav-theme";
   let togglesBound = false;
 
+  // An explicit user choice ("dark"/"light") is stored; anything else means
+  // "no explicit choice — defer to the browser".
+  function getStoredPreference() {
+    const stored = localStorage.getItem(storageKey);
+    return stored === "dark" || stored === "light" ? stored : null;
+  }
+
+  function systemPrefersDark() {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+
+  // Effective theme = explicit stored choice if any, otherwise the browser/OS
+  // preference (Chrome's built-in dark mode). Our theme is subservient to it:
+  // absent a user override, whatever Chrome reports wins. Light is the last resort.
   function getTheme() {
-    return localStorage.getItem(storageKey) === "dark" ? "dark" : "light";
+    const stored = getStoredPreference();
+    if (stored) return stored;
+    return systemPrefersDark() ? "dark" : "light";
   }
 
   function applyTheme(theme) {
     const isDark = theme === "dark";
-    document.documentElement.classList.toggle("dark-mode", isDark);
+    const root = document.documentElement;
+    root.classList.toggle("dark-mode", isDark);
+    // Declare the active scheme to the UA so native controls (form inputs,
+    // <progress>, scrollbars, date pickers) render to match — this is what makes
+    // dark mode cooperate with the browser's built-in accessibility rendering.
+    if (root.style) {
+      root.style.colorScheme = isDark ? "dark" : "light";
+    }
 
     if (document.body) {
       document.body.classList.toggle("dark-mode", isDark);
@@ -60,9 +84,29 @@
     toggleTheme();
   }
 
+  // When the user has NOT made an explicit choice, follow live changes to the
+  // browser/OS scheme (e.g. Chrome auto-switching at sunset).
+  function watchSystemPreference() {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      if (!getStoredPreference()) {
+        applyTheme(getTheme());
+      }
+    };
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", onChange);
+    } else if (typeof mq.addListener === "function") {
+      mq.addListener(onChange);
+    }
+  }
+
   function bindThemeToggles() {
     if (!togglesBound) {
       document.addEventListener("click", handleThemeToggleClick);
+      watchSystemPreference();
       togglesBound = true;
     }
 
