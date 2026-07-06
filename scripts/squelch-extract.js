@@ -101,11 +101,13 @@ function subbassHopSec(subbass) { return subbass.length > 1 ? subbass[1].t - sub
 // anything except the sub-bass-ratio denominator.
 function makeValueFor(sq, baseline, eventCtx) {
   return function valueFor(name, event) {
-    const c = eventCtx(event);
     const pts = sq.subbass.slice(event.i_start, event.i_end + 1);
     if (name === "tonality") return median(pts.map((p) => p.tonality));
     if (name === "level") {
-      const dDb = median(pts.map((p) => p.level_db)) - floorAt(baseline, "subbass", c.speed);
+      if (!pts.length) return null;
+      const floor = floorAt(baseline, "subbass", eventCtx(event).speed);
+      if (!isFinite(floor) || floor <= 0) return null;
+      const dDb = 10 * Math.log10(median(pts.map((p) => p.energy)) / floor);
       const v = dDb / LEVEL_NORM_DB;
       return v < 0 ? 0 : v > 1 ? 1 : v;
     }
