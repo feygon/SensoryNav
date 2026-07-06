@@ -55,7 +55,7 @@ function main() {
   const idleWindows = []; // [t_start, t_end) for every window with speed < IDLE_SPEED_MPS
   for (const w of scored) {
     const t = (w.started_at_ms - t0) / 1000;
-    const rt = Math.round(t);
+    const rt = Math.floor(t);
     if (!speedByRoundedT.has(rt)) speedByRoundedT.set(rt, w.speed_mps);
     if (w.speed_mps < IDLE_SPEED_MPS) idleWindows.push([t, t + WINDOW_DURATION_S]);
   }
@@ -64,7 +64,7 @@ function main() {
   const idleTonality = [];
   const roughTonality = [];
   for (const p of squelch.subbass) {
-    const speed = speedByRoundedT.get(Math.round(p.t));
+    const speed = speedByRoundedT.get(Math.floor(p.t));
     if (speed === undefined) continue;
     if (speed < IDLE_SPEED_MPS) idleTonality.push(p.tonality);
     else if (speed >= ROUGH_SPEED_MPS) roughTonality.push(p.tonality);
