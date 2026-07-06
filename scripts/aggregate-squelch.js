@@ -6,6 +6,7 @@
 // mapped to lat/lon through the scored windows. Default band = low (road rumble, clean of
 // speech, weighted highest); talking is NOT excluded because speech lives in mid/high, not low.
 // Usage: node scripts/aggregate-squelch.js [cellSizeMeters=25] [band=low]
+// band is any key squelch-clean.json carries a per-point array for: subbass|low|mid|high.
 "use strict";
 const fs = require("fs");
 

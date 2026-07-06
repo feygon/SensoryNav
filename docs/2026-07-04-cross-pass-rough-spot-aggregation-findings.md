@@ -163,3 +163,51 @@ This tooling was built in exploratory/iterative mode, not the full Superpowers s
 the pieces that touch product/harness code (`roughness-db.js`, `baseline.js` overlap,
 `theme.js`); the `scripts/` analysis tooling is test-light by intent. The dark-mode website
 changes and these research artifacts are committed separately from SP3.
+
+## 2026-07-06 — spectral-chaos reproducibility rerun
+
+TL;DR: new spectral-chaos ICC is **worse** than the old amplitude-chaos baseline on `low`
+(0.25 vs 0.37) and roughly comparable — slightly below — on `subbass` (0.33 vs 0.37). Both
+remain well below delta-dB loudness (0.63). The new DSP does not improve chaos as a positional
+signal; sub-band chaos is still the least location-stable metric of the three tried.
+
+**What changed:** all 6 passes (jc1–jc5 + hwy26) re-extracted through `squelch-extract.js`,
+which now runs the new spectral-chaos DSP (`harness/score/spectral-chaos.js`) instead of the
+old amplitude-based chaos. `squelch-clean.json` per pass is now shaped
+`{params, subbass, low, mid, high, subbass_floor}`, each band an array of points carrying
+`.chaos` (`= 1 − tonality`).
+
+| pass | subbass/low/mid/high pts | events |
+|---|---|---|
+| jc1 | 1726 | 122 |
+| jc2 | 1845–1846 | 133 |
+| jc3 (score-seat) | 2479–2480 | 191 |
+| jc4 | 2444–2445 | 179 |
+| jc5 | 1926–1927 | 149 |
+| hwy26 | 5028 | 391 |
+
+**`aggregate-squelch.js`:** ran unmodified against the new file shape — it already reads
+`parse(squelch-clean.json)[BAND]` and `.chaos` per point, so no shape fix was needed for either
+`low` or `subbass`. Only change made: a one-line usage-comment note documenting `subbass` as a
+valid `band` value alongside `low`/`mid`/`high` (no math touched).
+
+**Results (5 JC passes, cell 25 m, n=236 cells with ≥2 passes):**
+
+| band | ICC | ICC (peak p90) | split-half Spearman | vs loudness 0.63 | vs old chaos 0.37 |
+|---|---|---|---|---|---|
+| low | 0.248 (weak) | 0.256 | 0.069 | weaker | weaker |
+| subbass | 0.328 (moderate) | 0.381 | 0.320 | weaker | ~comparable, slightly below |
+
+Coverage identical for both bands (same lat/lon join, only the chaos series differs): 268
+cells total, 173 driven by all 5 passes, 30 by 4, 21 by 3, 12 by 2, 32 singletons.
+
+**Read:** neither chaos band beats delta-dB loudness as a positional signal, and sub-bass
+chaos is at best on par with the old amplitude-chaos number, not an improvement over it. `low`
+chaos is clearly worse than both priors. Loudness (delta-dB) remains the strongest reproducible
+positional signal found so far.
+
+**Coverage caveat:** Johnson Creek Rd is smooth, relatively new asphalt — texture
+discrimination (what chaos is meant to pick up) is under-exercised on this road. The
+SE 82nd/39th Ave rough-road capture (not yet collected) is the test that would actually stress
+chaos's ability to discriminate texture; until then, "chaos underperforms loudness here" should
+be read as "on smooth asphalt," not as a general verdict on the spectral-chaos DSP.
