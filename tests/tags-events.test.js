@@ -14,4 +14,11 @@ const longBurst = longSeries.map((p, i) => ({ t: p.t, chaos: i >= 50 && i <= 61 
 const splitEv = detectEvents(longBurst);
 assert.strictEqual(splitEv.length, 2, "12-hop run over maxLenS splits into two events");
 assert.ok(splitEv[0].i_end === 57 && splitEv[1].i_start === 58, "split boundary is at the 8-hop maxN cap");
+// near-silence guard: a low_conf point must never seed an event, even if it clears the
+// chaos threshold (near-silence tonality->0 drives chaos->1, the max, so without this guard
+// it would be the MOST likely point to seed).
+const lowConfBurst = flat.map((p, i) => ({ t: p.t, chaos: i === 10 ? 0.9 : 0.1, low_conf: i === 10 }));
+assert.strictEqual(detectEvents(lowConfBurst).length, 0, "low_conf point cannot seed an event");
+const notLowConfBurst = flat.map((p, i) => ({ t: p.t, chaos: i === 10 ? 0.9 : 0.1, low_conf: false }));
+assert.strictEqual(detectEvents(notLowConfBurst).length, 1, "same point with low_conf:false seeds one event");
 console.log("tags-events tests passed");

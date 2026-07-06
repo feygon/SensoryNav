@@ -62,4 +62,14 @@ const bsb = fitBaseline(sb, { MIN_BIN_SAMPLES: 20 });
 assert.ok(floorAt(bsb, "subbass", 5) > 1.5 && floorAt(bsb, "subbass", 5) < 2.6, `subbass floor@5=${floorAt(bsb, "subbass", 5)}`);
 assert.strictEqual(baselineMeta(bsb).subbass.qualified_bins, 1);
 
+// robust to a band with zero finite values at all (e.g. run-scorer.js's SP3 samples, which
+// never set a `subbass` field): fitBaseline must not throw, and the band's floor must fall
+// back to a finite EPS floor with zero qualified bins, not NaN.
+const noSubbass = [];
+for (let i = 0; i < 25; i++) noSubbass.push({ speed: 5, low: 1 + i * 0.04, mid: 1 + i * 0.04, high: 1 + i * 0.04, reliability: 1 });
+const bNoSub = fitBaseline(noSubbass, { MIN_BIN_SAMPLES: 20 });
+assert.ok(bNoSub.subbass, "baseline.subbass exists even with no subbass field in samples");
+assert.ok(isFinite(floorAt(bNoSub, "subbass", 5)), `floorAt subbass should be finite, got ${floorAt(bNoSub, "subbass", 5)}`);
+assert.strictEqual(baselineMeta(bNoSub).subbass.fell_back_to_global, true);
+
 console.log("score-baseline tests passed");

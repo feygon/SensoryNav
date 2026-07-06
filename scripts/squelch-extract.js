@@ -113,6 +113,12 @@ function subbassHopSec(subbass) { return subbass.length > 1 ? subbass[1].t - sub
 // starter tags key off the sub-bass band, so this never needs the low/mid/high series for
 // anything except the sub-bass-ratio denominator.
 function makeValueFor(sq, baseline, eventCtx) {
+  // Per-band FFT size N (sq.params.bands), needed to normalize each band's raw `energy`
+  // (Sigma|FFT|^2, which scales ~N^2) to comparable POWER before the sub-bass-ratio: subbass
+  // uses N=16384 vs high's N=512, a (16384/512)^2 ~ 1024x raw-energy inflation that otherwise
+  // pins the ratio near 1.0 regardless of actual sub-bass dominance.
+  const bandN = {};
+  for (const b of sq.params.bands) bandN[b.key] = b.N;
   return function valueFor(name, event) {
     const pts = sq.subbass.slice(event.i_start, event.i_end + 1);
     if (name === "tonality") return median(pts.map((p) => p.tonality));
@@ -125,13 +131,17 @@ function makeValueFor(sq, baseline, eventCtx) {
       return v < 0 ? 0 : v > 1 ? 1 : v;
     }
     if (name === "sub-bass-ratio") {
+      if (!pts.length) return null;
       const ratios = pts.map((p) => {
         const j = nearestIndex(sq.low, p.t, (x) => x.t), k = nearestIndex(sq.mid, p.t, (x) => x.t), m = nearestIndex(sq.high, p.t, (x) => x.t);
-        const lo = j >= 0 ? sq.low[j].energy : 0, mi = k >= 0 ? sq.mid[k].energy : 0, hi = m >= 0 ? sq.high[m].energy : 0;
-        const total = p.energy + lo + mi + hi;
-        return total > 0 ? p.energy / total : 0;
-      });
-      return median(ratios);
+        const subPower = p.energy / (bandN.subbass * bandN.subbass);
+        const loPower = j >= 0 ? sq.low[j].energy / (bandN.low * bandN.low) : 0;
+        const miPower = k >= 0 ? sq.mid[k].energy / (bandN.mid * bandN.mid) : 0;
+        const hiPower = m >= 0 ? sq.high[m].energy / (bandN.high * bandN.high) : 0;
+        const total = subPower + loPower + miPower + hiPower;
+        return total > 0 ? subPower / total : null;
+      }).filter((r) => r != null);
+      return ratios.length ? median(ratios) : null;
     }
     if (name === "onset-sharpness") return attackSlope(sq.subbass, event);
     return null;
@@ -148,6 +158,7 @@ function main() {
 
   const scoredWindows = buildScoredWindows(sidecar, sc, {});
   const baselineSamples = buildBaselineSamples(scoredWindows, sq.subbass);
+  if (!baselineSamples.length) throw new Error("squelch-extract: no baseline samples for " + path.basename(sc));
   const baseline = fitBaseline(baselineSamples, {});
   const floorCheck = floorAt(baseline, "subbass", baselineSamples[0].speed);
   if (!isFinite(floorCheck)) throw new Error("squelch-extract: subbass baseline floor is not finite — check baselineSamples for missing subbass energies");
@@ -166,10 +177,21 @@ function main() {
     const i = nearestIndex(scoredWindows, tMid, (w) => w.t);
     return scoredWindows[i];
   };
+  // Belt-and-suspenders on the near-silence guard: detectEvents (harness/tags/events.js)
+  // already refuses to let a low_conf point seed or extend an event, so this should rarely
+  // fire in practice. It's defensive because a merge can still pull an "off" low_conf point
+  // INTO an event's [i_start,i_end] span between two on-runs (mergeGapS), so any tag whose
+  // value derives from a low_conf window gets its confidence forced to 0 rather than
+  // silently trusting a near-silence reading.
+  const reliabilityFor = (name, event) => {
+    const pts = sq.subbass.slice(event.i_start, event.i_end + 1);
+    if (pts.some((p) => p.low_conf)) return 0;
+    return eventCtx(event).reliability;
+  };
   const ctx = {
     registry,
     valueFor: makeValueFor(sq, baseline, eventCtx),
-    reliabilityFor: (name, event) => eventCtx(event).reliability
+    reliabilityFor
   };
 
   const tagEvents = events.map((event) => {

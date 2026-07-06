@@ -7,7 +7,12 @@ function detectEvents(series, opts) {
   const raw = [];
   let s = -1;
   for (let i = 0; i <= series.length; i++) {
-    const on = i < series.length && series[i].chaos > thr;
+    // A near-silence point (low_conf) must never seed or extend an event: the Global
+    // Constraints spec says a near-silence window emits confidence 0 and cannot seed an
+    // event, but tonality->0 in near-silence drives chaos->1 (max), so without this guard
+    // it would be the MOST likely point to seed. Existing {t,chaos}-only test fixtures have
+    // `low_conf` undefined, and `!undefined === true`, so this is backward-compatible.
+    const on = i < series.length && series[i].chaos > thr && !series[i].low_conf;
     if (on && s < 0) s = i;
     else if (!on && s >= 0) { raw.push([s, i - 1]); s = -1; }
   }

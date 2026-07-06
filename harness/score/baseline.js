@@ -16,8 +16,19 @@ function overlapFraction(span, tiers) {
 }
 
 function fitBand(reliable, band, p) {
+  // Robustness: some callers (e.g. run-scorer.js's SP3 samples) never set a value for this
+  // band at all (no `subbass` key), so every value is `undefined`. weightedQuantile is
+  // weight-based, not value-based, so it would silently return `undefined` there and poison
+  // the floor to NaN. Detect "no finite values for this band whatsoever" up front and fall
+  // back to a finite EPS floor with zero qualified bins, exactly like the existing
+  // too-few-samples fallback below.
+  const values = reliable.map((s) => s[band]);
+  if (!values.some((v) => typeof v === "number" && isFinite(v))) {
+    return { points: [], global: p.EPS_FLOOR, meta: { qualified_bins: 0, fell_back_to_global: true, n_samples: reliable.length } };
+  }
+
   // global null-model floor
-  const global = Math.max(p.EPS_FLOOR, weightedQuantile(reliable.map((s) => s[band]), reliable.map((s) => s.reliability), p.FLOOR_Q));
+  const global = Math.max(p.EPS_FLOOR, weightedQuantile(values, reliable.map((s) => s.reliability), p.FLOOR_Q));
 
   // bucket by speed, then greedily accumulate buckets (in speed order) into qualifying bins
   const byBin = new Map();
