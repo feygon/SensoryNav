@@ -36,4 +36,21 @@ function powerSpectrum(samples, start, N) {
   for (let k = 0; k < half; k++) out[k] = re[k] * re[k] + im[k] * im[k];
   return out;
 }
-module.exports = { fft, hann, powerSpectrum, SBANDS };
+// PEAK_K = 3: a band-bin counts as "peak" energy once it exceeds 3x the
+// band's median power. Tuned against the pure-tone/flat-spectrum fixtures
+// in tests/score-spectral-chaos.test.js (tone > 0.8, flat < 0.2).
+const PEAK_K = 3;
+function median(arr) { const s = Array.prototype.slice.call(arr).sort((a, b) => a - b); const m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0; }
+function tonality(power, loBin, hiBin, k) {
+  k = k || PEAK_K;
+  const band = [];
+  for (let b = loBin; b <= hiBin; b++) band.push(power[b] || 0);
+  const total = band.reduce((s, x) => s + x, 0);
+  if (total <= 0) return 0;
+  const floor = median(band) * k;
+  let peak = 0;
+  for (const p of band) if (p > floor) peak += p;
+  const t = peak / total;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+module.exports = { fft, hann, powerSpectrum, SBANDS, tonality, PEAK_K, median };
