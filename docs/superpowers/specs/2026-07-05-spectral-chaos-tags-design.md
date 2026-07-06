@@ -110,7 +110,7 @@ rather than fragmenting it into false chaos). At 48 kHz:
 | high | 1000–4000 Hz | 3 | 512 | ~281 Hz |
 
 **Tonality ∈ [0, 1]** = harmonic-to-noise via **spectral peak prominence**: `sum(energy in bins
-exceeding a percentile-smoothed spectral floor, e.g. local median × k) ÷ total band energy`, clamped
+exceeding a percentile-smoothed spectral floor = local median × `PEAK_K`) ÷ total band energy`, clamped
 to [0, 1] (tonal comb → 1; broadband → 0). Spectral flatness is retained only as the
 discrimination-test comparison baseline. **Chaos = 1 − tonality** (also [0, 1]); for display it maps
 to line hue/thickness via a single constant **`CHAOS_DISPLAY_DB = 8`** (chaos × 8 → dB-ish
@@ -151,8 +151,9 @@ bandwidth, level, duration, speech-contaminated` (+ `speed-locked` future). Each
 - `reliability_factor` — the window reliability the pipeline already computes: **0** if clipping
   ≥ 2% of samples, **0** if `near_floor`, **0** if speech-contaminated *for mid/high tags only*
   (sub-bass/low tags ignore the speech flag — speech is mid/high); otherwise the SP2 reliability.
-- `measure_sharpness` — how decisive the underlying measure is (e.g. tonality confidence scales with
-  the peak-prominence margin; a value near the [0,1] midpoint → lower confidence).
+- `measure_sharpness` — how decisive the underlying measure is. Default for [0,1]-valued tags:
+  `sharpness = clamp(2 · |value − 0.5|, 0, 1)` (decisive near the extremes, uncertain at the
+  midpoint); refine per tag during TDD.
 - `accel_cap` — **1.0** for `accel_dependency: none`, **0.6** for `disambiguates`, **0.4** for
   `required` (audio alone cannot fully determine it; the cap makes the accelerometer seam explicit).
 
