@@ -26,17 +26,24 @@ if (hiresPath) {
   catch (e) { console.error("hires load failed:", e.message); }
 }
 
-// Optional aperiodic-chaos ribbon series (from squelch-extract). Passed as a flag:
+// Optional folded sub-bass chaos+tonality series (from squelch-extract). Passed as a flag:
 //   squelch=out/score-XX/squelch-clean.json
+// Each point is { t, energy, level_db, tonality, chaos, peak_freqs, low_conf } (chaos = 1-tonality).
 let squelch = null;
 const squelchFlag = flags.find((f) => f.startsWith("squelch="));
 if (squelchFlag) {
-  try {
-    squelch = JSON.parse(fs.readFileSync(squelchFlag.slice(8), "utf8"));
-    const bs = (s, pad) => { let lo = Infinity, hi = -Infinity; for (const p of s) { lo = Math.min(lo, p.c - p.chaos); hi = Math.max(hi, p.c + p.chaos); } return [Math.floor(lo) - pad, Math.ceil(hi) + pad]; };
-    const mi = bs(squelch.mid, 2), hg = bs(squelch.high, 2);
-    squelch.scale = { low: bs(squelch.low, 2), mh: [Math.min(mi[0], hg[0]), Math.max(mi[1], hg[1])] };
-  } catch (e) { console.error("squelch load failed:", e.message); }
+  try { squelch = JSON.parse(fs.readFileSync(squelchFlag.slice(8), "utf8")); }
+  catch (e) { console.error("squelch load failed:", e.message); }
+}
+
+// Optional tag-event marks (from squelch-extract's event tagger). Passed as a flag:
+//   tags=out/score-XX/tags-clean.json
+// { events: [{ t_start, t_end, lat, lon, speed_mps, tags: {name:{value,confidence}}, accel_gaps }] }
+let tagsData = null;
+const tagsFlag = flags.find((f) => f.startsWith("tags="));
+if (tagsFlag) {
+  try { tagsData = JSON.parse(fs.readFileSync(tagsFlag.slice(5), "utf8")); }
+  catch (e) { console.error("tags load failed:", e.message); }
 }
 
 const scored = JSON.parse(fs.readFileSync(inPath, "utf8"));
@@ -48,6 +55,67 @@ const pts = scored.map((r) => ({
   rdb: r.roughness_db // weighted dB-above-floor; may be undefined for older scored files
 }));
 const maxT = pts[pts.length - 1].t;
+
+// ---- fold the sub-bass series against this run's own speed-conditioned floor (dB) ----
+// squelch-extract's tags-clean.json "level" tag uses a speed-conditioned floor internally
+// (harness/score/baseline.js) but squelch-clean.json doesn't export a per-point floor for
+// sub-bass. Compute one here the same way (bin by this run's own speed, take the per-bin
+// p10, interpolate between bins) so the folded panel can shade a delta-dB gap the same way
+// the low/mid/high panels already do against their own baselines.
+function percentile(arr, q) {
+  const s = arr.slice().sort((a, b) => a - b);
+  if (!s.length) return NaN;
+  return s[Math.min(s.length - 1, Math.max(0, Math.round(q * (s.length - 1))))];
+}
+function nearestSpeedAt(t) {
+  let lo = 0, hi = pts.length - 1;
+  if (t <= pts[0].t) return pts[0].speed;
+  if (t >= pts[hi].t) return pts[hi].speed;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pts[mid].t <= t) lo = mid; else hi = mid; }
+  return (t - pts[lo].t <= pts[hi].t - t) ? pts[lo].speed : pts[hi].speed;
+}
+function fitSubbassFloor(subbass) {
+  const BIN = 2.0, Q = 0.10, MIN_N = 15;
+  const withSpeed = subbass.map((p) => ({ p, speed: nearestSpeedAt(p.t) }));
+  const global = percentile(withSpeed.map((x) => x.p.level_db), Q);
+  const byBin = new Map();
+  for (const x of withSpeed) {
+    const k = Math.floor(x.speed / BIN);
+    if (!byBin.has(k)) byBin.set(k, []);
+    byBin.get(k).push(x);
+  }
+  const keys = Array.from(byBin.keys()).sort((a, b) => a - b);
+  const bins = [];
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    const rep = buf.reduce((s, x) => s + x.speed, 0) / buf.length;
+    bins.push({ speed: rep, floor: percentile(buf.map((x) => x.p.level_db), Q) });
+    buf = [];
+  };
+  for (const k of keys) { buf = buf.concat(byBin.get(k)); if (buf.length >= MIN_N) flush(); }
+  flush(); // trailing partial bin: still counted rather than silently dropped
+  bins.sort((a, b) => a.speed - b.speed);
+  function floorAtSpeed(sp) {
+    if (!bins.length) return global;
+    if (bins.length === 1) return bins[0].floor;
+    if (sp <= bins[0].speed) return bins[0].floor;
+    if (sp >= bins[bins.length - 1].speed) return bins[bins.length - 1].floor;
+    for (let i = 0; i < bins.length - 1; i++) {
+      if (sp >= bins[i].speed && sp < bins[i + 1].speed) {
+        const frac = (sp - bins[i].speed) / (bins[i + 1].speed - bins[i].speed);
+        return bins[i].floor + frac * (bins[i + 1].floor - bins[i].floor);
+      }
+    }
+    return global;
+  }
+  for (const x of withSpeed) x.p.floor_db = +floorAtSpeed(x.speed).toFixed(2);
+}
+if (squelch && squelch.subbass && squelch.subbass.length) {
+  fitSubbassFloor(squelch.subbass);
+  const lv = squelch.subbass.map((p) => p.level_db).concat(squelch.subbass.map((p) => p.floor_db));
+  squelch.scale = { sub: [Math.floor(Math.min.apply(null, lv)) - 3, Math.ceil(Math.max.apply(null, lv)) + 3] };
+}
 
 // ---- annotation detection (server-side data analysis) ----
 function runs(pred, minLen) {
@@ -83,14 +151,17 @@ function chartClient(D) {
   var plotW = W - mL - mR;
   var mainH = 280, gap = 78; // inter-panel gap; also hosts the hover tooltip below each panel
   var mainTop = mT;
-  var lowTop = mainTop + mainH + gap, lowH = 110;   // low (road) panel
+  var subTop = mainTop + mainH + gap, subH = 110;    // folded sub-bass panel (tonal->chaos hue + chaos width)
+  var lowTop = subTop + subH + gap, lowH = 110;      // low (road) panel
   var mhTop = lowTop + lowH + gap, mhH = 130;        // mid + high (voices + cargo) panel
   var SPEED_MAX = 20, ROUGH_MAX = 100, ROUGHDB_MAX = 16;
   var C_SPEED = "#4da3ff", C_ROUGH = "#ffc04d", C_TEXT = "#dcdcdc", C_GRID = "#444", C_AXIS = "#888", C_BG = "#1a1a1a", C_HEAD = "#f5f5f5";
   var C_LO = "#5fd35f", C_MI = "#b98cff", C_HI = "#ff7bac"; // low/mid/high band energy (dB)
   var C_LOF = "#7cc47c", C_MIF = "#8f7ab8", C_HIF = "#b87a92"; // baseline (floor) dashed lines — dimmer band hues
+  var C_SUBF = "#6f7f9f"; // sub-bass baseline (dashed) — neutral blue-gray, distinct from the tonal->chaos ramp
   var LOW_DB = [-42, -20];  // low panel dB range (road rumble), level view
   var MH_DB = [-72, -25];   // mid/high panel dB range, level view
+  var CHAOS_DISPLAY_DB = 8; // sub-bass folded line: stroke-width = chaos * CHAOS_DISPLAY_DB (redundant, CVD-safe channel)
   var BAND = {
     stop:   { fill: "rgba(150,150,150,0.14)", edge: "#9a9a9a", label: "stop" },
     rough:  { fill: "rgba(255,120,90,0.16)",  edge: "#ff785a", label: "rough" },
@@ -104,12 +175,11 @@ function chartClient(D) {
   var envelopeOn = !!D.envelopeOn;
   var smoothW = 5; // temporal-envelope width in seconds (odd; 1 = raw)
   var squelch = D.squelch || null;
-  var ribbonOn = !!squelch; // default the band panels to the aperiodic-chaos ribbon view
+  var events = D.events || []; // tag-event marks (from tags-clean.json); [] when absent, never an error
   var chart = document.getElementById("chart");
   var rangeEl = document.getElementById("range");
   var playBtn = document.getElementById("play");
   var bandsBtn = document.getElementById("bands");
-  var ribbonBtn = document.getElementById("ribbon");
   var roughBtn = document.getElementById("roughmode");
   var smoothSlider = document.getElementById("smooth");
   var smoothVal = document.getElementById("smoothval");
@@ -133,20 +203,23 @@ function chartClient(D) {
   function audioTime() { return audio ? audio.currentTime : null; }
   function dur() { return audio && audio.duration ? audio.duration : maxT; }
   function isZoomed(v) { v = v || view; return (v[1] - v[0]) < maxT - 0.5; }
-  function bandsShown() { return bandsOn && ((D.hires && D.hires.lo) || squelch); }
+  function subShown() { return bandsOn && !!(squelch && squelch.subbass && squelch.subbass.length); }
+  function lowMhShown() { return bandsOn && !!(D.hires && D.hires.lo); }
+  function bandsShown() { return subShown() || lowMhShown(); }
   function mainBottom() { return mainTop + mainH; }
-  function chartBottom() { return bandsShown() ? mhTop + mhH : mainBottom(); }
+  function chartBottom() { return lowMhShown() ? mhTop + mhH : subShown() ? subTop + subH : mainBottom(); }
   function svgH() { return chartBottom() + mB; }
   function xf(t) { return mL + (t - view[0]) / (view[1] - view[0]) * plotW; }
   function yS(v) { return mainTop + mainH * (1 - Math.min(v, SPEED_MAX) / SPEED_MAX); }
   function yR(v) { return mainTop + mainH * (1 - Math.min(v, ROUGH_MAX) / ROUGH_MAX); }
   function yRdb(v) { return mainTop + mainH * (1 - Math.min(v, ROUGHDB_MAX) / ROUGHDB_MAX); }
   function yRough(v) { return roughMode === "db" ? yRdb(v) : yR(v); }
-  // dB axis ranges auto-fit to the chaos data in ribbon mode, else the fixed level-view range.
-  function lowRange() { return (ribbonOn && squelch) ? squelch.scale.low : LOW_DB; }
-  function mhRange() { return (ribbonOn && squelch) ? squelch.scale.mh : MH_DB; }
+  function lowRange() { return LOW_DB; }
+  function mhRange() { return MH_DB; }
+  function subRange() { return (squelch && squelch.scale && squelch.scale.sub) || [-60, -10]; }
   function yDbLow(db) { var r = lowRange(); return lowTop + lowH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
   function yDbMH(db) { var r = mhRange(); return mhTop + mhH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
+  function yDbSub(db) { var r = subRange(); return subTop + subH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
   function niceTicks(r) { var a = r[0], b = r[1], rd = function (v) { return Math.round(v / 2) * 2; }; return [rd(a + (b - a) * 0.18), rd((a + b) / 2), rd(a + (b - a) * 0.82)]; }
   function step(span) { return span <= 40 ? 5 : span <= 120 ? 15 : span <= 300 ? 30 : 60; }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -257,38 +330,94 @@ function chartClient(D) {
     floor.reverse();
     return '<polygon fill="rgba(95,211,95,0.16)" stroke="none" points="' + top.trim() + " " + floor.join(" ") + '"/>';
   }
-  // Aperiodic-chaos ribbon: per squelch point a vertical bar spanning ±chaos around the band
-  // level, coloured cool (tonal/rhythmic, habituated) → hot (noise-like, novel), plus a centre
-  // line at the level. Replaces the 47 Hz picket fence with the felt-chaos view.
-  function hueMix(t) { // 0 = tonal cool, 1 = chaos hot
-    var a = [58, 111, 216], b = [255, 90, 58], m = function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); };
+  // Tonal->chaos ramp for the folded sub-bass panel: 0 = tonal (blue, habituated engine tone),
+  // 1 = chaos (yellow, novel/road-like). Thickness (stroke-width, set by the caller) carries
+  // the SAME chaos signal redundantly, so the panel still reads correctly for colourblind
+  // viewers even with the hue channel removed. Deliberately blue->yellow, not red->green.
+  function hueMix(t) {
+    var a = [58, 111, 216], b = [235, 215, 60], m = function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); };
     return "rgb(" + m(0) + "," + m(1) + "," + m(2) + ")";
   }
-  function chaosRibbon(series, yfn, lineColor) {
-    if (!series || !series.length) return "";
-    var span = view[1] - view[0], hop = squelch.params.hopSec;
-    var stride = Math.max(1, Math.floor((span / hop) / 900)); // stride by points IN VIEW, not total
-    var bw = Math.max(1, stride * hop / span * plotW);          // bar spans its stride so bars abut (no gap)
-    var bars = "", line = "";
-    for (var i = 0; i < series.length; i += stride) {
-      var p = series[i]; if (p.t < view[0] - 1 || p.t > view[1] + 1) continue;
-      var x = xf(p.t), yTop = yfn(p.c + p.chaos), yBot = yfn(p.c - p.chaos);
-      bars += '<rect x="' + (x - bw / 2).toFixed(2) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(2)
-        + '" height="' + Math.max(0.5, yBot - yTop).toFixed(1) + '" fill="' + hueMix(clamp(1 - p.per, 0, 1)) + '" opacity="0.5"/>';
-      line += x.toFixed(1) + "," + yfn(p.c).toFixed(1) + " ";
+  function subStride() { return Math.max(1, Math.floor(((view[1] - view[0]) / squelch.params.hopSec) / 650)); }
+  // Folded sub-bass line: level over its own speed-conditioned baseline (delta-dB shading, same
+  // grammar as the low panel), but drawn as short per-segment strokes so each can carry its own
+  // hue (tonal->chaos) and width (chaos * CHAOS_DISPLAY_DB) — a single <polyline> can't vary
+  // colour/width along its length.
+  function subFoldedLine() {
+    if (!subShown()) return "";
+    var sub = squelch.subbass, stride = subStride(), segs = "", prev = null;
+    for (var i = 0; i < sub.length; i += stride) {
+      var p = sub[i];
+      if (p.t < view[0] - 1 || p.t > view[1] + 1) { prev = null; continue; }
+      var x = xf(p.t), y = yDbSub(p.level_db), ch = clamp(p.chaos, 0, 1);
+      if (prev) {
+        var mch = (prev.chaos + ch) / 2;
+        segs += '<line x1="' + prev.x.toFixed(1) + '" y1="' + prev.y.toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1)
+          + '" stroke="' + hueMix(mch) + '" stroke-width="' + Math.max(0.6, mch * CHAOS_DISPLAY_DB).toFixed(2) + '" stroke-linecap="round"/>';
+      }
+      prev = { x: x, y: y, chaos: ch };
     }
-    return bars + '<polyline fill="none" stroke="' + lineColor + '" stroke-width="1.3" points="' + line.trim() + '"/>';
+    return segs;
+  }
+  function subFloorLine() {
+    if (!subShown()) return "";
+    var sub = squelch.subbass, stride = subStride(), d = "";
+    for (var i = 0; i < sub.length; i += stride) {
+      var p = sub[i]; if (p.t < view[0] - 0.1 || p.t > view[1] + 0.1) continue;
+      d += xf(p.t).toFixed(1) + "," + yDbSub(p.floor_db != null ? p.floor_db : p.level_db).toFixed(1) + " ";
+    }
+    return d ? '<polyline fill="none" stroke="' + C_SUBF + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" points="' + d.trim() + '"/>' : "";
+  }
+  function subDeltaFill() {
+    if (!subShown()) return "";
+    var sub = squelch.subbass, stride = subStride(), top = "", floor = [], any = false;
+    for (var i = 0; i < sub.length; i += stride) {
+      var p = sub[i]; if (p.t < view[0] - 0.1 || p.t > view[1] + 0.1) continue;
+      var f = p.floor_db != null ? p.floor_db : p.level_db, a = p.level_db > f ? p.level_db : f;
+      var x = xf(p.t).toFixed(1);
+      top += x + "," + yDbSub(a).toFixed(1) + " ";
+      floor.push(x + "," + yDbSub(f).toFixed(1));
+      any = true;
+    }
+    if (!any) return "";
+    floor.reverse();
+    return '<polygon fill="rgba(111,127,159,0.16)" stroke="none" points="' + top.trim() + " " + floor.join(" ") + '"/>';
+  }
+  function subPanelSvg() {
+    if (!subShown()) return "";
+    return subDeltaFill() + subFloorLine() + subFoldedLine();
   }
   function bandLines() {
     var hr = D.hires;
-    if (!bandsShown()) return "";
-    if (ribbonOn && squelch) { // chaos view: low ribbon in the low panel, mid+high in the MH panel
-      return chaosRibbon(squelch.low, yDbLow, C_LO) + chaosRibbon(squelch.mid, yDbMH, C_MI) + chaosRibbon(squelch.high, yDbMH, C_HI);
-    }
+    if (!lowMhShown()) return "";
     // level view — paint order: delta fill (back) -> dashed baselines -> live band lines (front)
     return lowDeltaFill()
       + bandFloorLine(hr.floLo, C_LOF, yDbLow) + bandFloorLine(hr.floMi, C_MIF, yDbMH) + bandFloorLine(hr.floHi, C_HIF, yDbMH)
       + bandLine(hr.lo, C_LO, yDbLow) + bandLine(hr.mi, C_MI, yDbMH) + bandLine(hr.hi, C_HI, yDbMH);
+  }
+  // Tag-event marks: small dots along the bottom edge of a panel, one per tags-clean.json event.
+  // Hover them (the bottom strip, see showHover) for a tooltip listing that event's tags.
+  function eventMidT(ev) { return (ev.t_start + ev.t_end) / 2; }
+  function eventMarks(top, bottom) {
+    if (!events.length) return "";
+    var y = bottom - 5, out = "";
+    for (var i = 0; i < events.length; i++) {
+      var tm = eventMidT(events[i]);
+      if (tm < view[0] - 1 || tm > view[1] + 1) continue;
+      out += '<circle cx="' + xf(tm).toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="#dcdcdc" opacity="0.55"/>';
+    }
+    return out;
+  }
+  function nearestEventNearX(sx) {
+    if (!events.length) return null;
+    var best = null, bd = Infinity;
+    for (var i = 0; i < events.length; i++) {
+      var tm = eventMidT(events[i]);
+      if (tm < view[0] - 1 || tm > view[1] + 1) continue;
+      var d = Math.abs(xf(tm) - sx);
+      if (d < bd) { bd = d; best = events[i]; }
+    }
+    return bd <= 6 ? best : null;
   }
 
   // Talking-contamination ribbon: a strip along the top marking windows where mid+high co-spike.
@@ -307,13 +436,16 @@ function chartClient(D) {
 
   function render() {
     var span = view[1] - view[0];
-    var showBands = bandsShown(), bottom = mainBottom(), cbottom = chartBottom(), H = svgH();
-    // x gridlines (both panels) + labels along the chart bottom
+    var showSub = subShown(), showLowMh = lowMhShown(), bottom = mainBottom(), cbottom = chartBottom(), H = svgH();
+    // x gridlines (all shown panels) + labels along the chart bottom
     var xg = "", st = step(span), gt0 = Math.ceil(view[0] / st) * st, t;
     for (t = gt0; t <= view[1] + 0.001; t += st) {
       var px = xf(t);
       xg += '<line x1="' + px.toFixed(1) + '" y1="' + mainTop + '" x2="' + px.toFixed(1) + '" y2="' + bottom + '" stroke="' + C_GRID + '" stroke-width="1"/>';
-      if (showBands) {
+      if (showSub) {
+        xg += '<line x1="' + px.toFixed(1) + '" y1="' + subTop + '" x2="' + px.toFixed(1) + '" y2="' + (subTop + subH) + '" stroke="' + C_GRID + '" stroke-width="1"/>';
+      }
+      if (showLowMh) {
         xg += '<line x1="' + px.toFixed(1) + '" y1="' + lowTop + '" x2="' + px.toFixed(1) + '" y2="' + (lowTop + lowH) + '" stroke="' + C_GRID + '" stroke-width="1"/>';
         xg += '<line x1="' + px.toFixed(1) + '" y1="' + mhTop + '" x2="' + px.toFixed(1) + '" y2="' + (mhTop + mhH) + '" stroke="' + C_GRID + '" stroke-width="1"/>';
       }
@@ -332,27 +464,28 @@ function chartClient(D) {
       var pyr = yRough(vr);
       rg += '<text x="' + (mL + plotW + 10) + '" y="' + (pyr + 4).toFixed(1) + '" fill="' + C_ROUGH + '" font-size="12" text-anchor="start">' + vr + '</text>';
     }
-    // two separate band panels when shown: LOW (road) and MID+HIGH (voices + cargo)
+    // band panels when shown: folded SUB-BASS (chaos), then LOW (road), then MID+HIGH (voices + cargo)
     var bandPanel = "";
-    if (showBands) {
-      function panelScaffold(top, h, ticks, yfn, labelHtml) {
-        var out = "";
-        for (var di = 0; di < ticks.length; di++) {
-          var yd = yfn(ticks[di]);
-          out += '<line x1="' + mL + '" y1="' + yd.toFixed(1) + '" x2="' + (mL + plotW) + '" y2="' + yd.toFixed(1) + '" stroke="' + C_GRID + '" stroke-width="0.5"/>';
-          out += '<text x="' + (mL - 8) + '" y="' + (yd + 4).toFixed(1) + '" fill="' + C_AXIS + '" font-size="11" text-anchor="end">' + ticks[di] + '</text>';
-        }
-        out += '<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + h + '" fill="none" stroke="' + C_AXIS + '" stroke-width="1"/>';
-        out += '<text x="' + mL + '" y="' + (top - 8) + '" fill="' + C_TEXT + '" font-size="12">' + labelHtml + '</text>';
-        return out;
+    function panelScaffold(top, h, ticks, yfn, labelHtml) {
+      var out = "";
+      for (var di = 0; di < ticks.length; di++) {
+        var yd = yfn(ticks[di]);
+        out += '<line x1="' + mL + '" y1="' + yd.toFixed(1) + '" x2="' + (mL + plotW) + '" y2="' + yd.toFixed(1) + '" stroke="' + C_GRID + '" stroke-width="0.5"/>';
+        out += '<text x="' + (mL - 8) + '" y="' + (yd + 4).toFixed(1) + '" fill="' + C_AXIS + '" font-size="11" text-anchor="end">' + ticks[di] + '</text>';
       }
-      var rib = ribbonOn && squelch;
-      bandPanel += panelScaffold(lowTop, lowH, rib ? niceTicks(lowRange()) : [-40, -30, -20], yDbLow, rib
-        ? '<tspan fill="' + C_LO + '" font-weight="600">low</tspan> 80-250 Hz &mdash; <tspan font-weight="600">aperiodic chaos</tspan> (dB): ribbon width = chaos, hue <tspan fill="#6f9bff">tonal</tspan>&rarr;<tspan fill="#ff7a5a">noise</tspan>'
-        : '<tspan fill="' + C_LO + '" font-weight="600">low</tspan> 80-250 Hz &mdash; road rumble (dB) &middot; <tspan fill="' + C_LOF + '">dashed = smooth-road baseline</tspan>, shaded gap = delta-dB');
-      bandPanel += panelScaffold(mhTop, mhH, rib ? niceTicks(mhRange()) : [-65, -50, -35], yDbMH, rib
-        ? '<tspan fill="' + C_MI + '" font-weight="600">mid</tspan> &nbsp;<tspan fill="' + C_HI + '" font-weight="600">high</tspan> &mdash; <tspan font-weight="600">aperiodic chaos</tspan> (dB): width = chaos, hue tonal&rarr;noise'
-        : '<tspan fill="' + C_MI + '" font-weight="600">mid</tspan> 250-1k &nbsp;<tspan fill="' + C_HI + '" font-weight="600">high</tspan> 1-4k Hz &mdash; voices + cargo (dB) &middot; dashed = baseline');
+      out += '<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + h + '" fill="none" stroke="' + C_AXIS + '" stroke-width="1"/>';
+      out += '<text x="' + mL + '" y="' + (top - 8) + '" fill="' + C_TEXT + '" font-size="12">' + labelHtml + '</text>';
+      return out;
+    }
+    if (showSub) {
+      bandPanel += panelScaffold(subTop, subH, niceTicks(subRange()), yDbSub,
+        '<tspan fill="#ebd73c" font-weight="600">sub-bass</tspan> 20-80 Hz (folded, dB) &mdash; hue <tspan fill="#3a6fd8">tonal</tspan>&rarr;<tspan fill="#ebd73c">chaos</tspan>, thickness = chaos &middot; dashed = own speed-conditioned baseline, shaded gap = delta-dB');
+    }
+    if (showLowMh) {
+      bandPanel += panelScaffold(lowTop, lowH, [-40, -30, -20], yDbLow,
+        '<tspan fill="' + C_LO + '" font-weight="600">low</tspan> 80-250 Hz &mdash; road rumble (dB) &middot; <tspan fill="' + C_LOF + '">dashed = smooth-road baseline</tspan>, shaded gap = delta-dB');
+      bandPanel += panelScaffold(mhTop, mhH, [-65, -50, -35], yDbMH,
+        '<tspan fill="' + C_MI + '" font-weight="600">mid</tspan> 250-1k &nbsp;<tspan fill="' + C_HI + '" font-weight="600">high</tspan> 1-4k Hz &mdash; voices + cargo (dB) &middot; dashed = baseline');
     }
     // annotation bands (main panel) + staggered labels
     var bandsSvg = "", labels = "", row = 0;
@@ -376,7 +509,9 @@ function chartClient(D) {
       + '<text x="' + mL + '" y="26" fill="' + C_TEXT + '" font-size="17" font-weight="600">' + esc(D.label) + ' — speed &amp; roughness over time</text>'
       + bandsSvg + xg + lg + rg + bandPanel
       + '<rect x="' + mL + '" y="' + mainTop + '" width="' + plotW + '" height="' + mainH + '" fill="none" stroke="' + C_AXIS + '" stroke-width="1"/>'
-      + hiresLine() + line("speed", C_SPEED) + roughDraw() + bandLines() + labels + speechRibbon() + playhead
+      + hiresLine() + line("speed", C_SPEED) + roughDraw() + eventMarks(mainTop, mainTop + mainH)
+      + subPanelSvg() + (showSub ? eventMarks(subTop, subTop + subH) : "")
+      + bandLines() + labels + speechRibbon() + playhead
       + '<text x="' + (mL - 40) + '" y="' + (mainTop + mainH / 2) + '" fill="' + C_SPEED + '" font-size="13" text-anchor="middle" transform="rotate(-90 ' + (mL - 40) + ' ' + (mainTop + mainH / 2) + ')">speed (m/s)</text>'
       + '<text x="' + (mL + plotW + 44) + '" y="' + (mainTop + mainH / 2) + '" fill="' + C_ROUGH + '" font-size="13" text-anchor="middle" transform="rotate(90 ' + (mL + plotW + 44) + ' ' + (mainTop + mainH / 2) + ')">' + (roughMode === "db" ? "roughness (dB above floor)" : "roughness_raw (0–100)") + '</text>'
       + '<text x="' + (mL + plotW / 2) + '" y="' + (H - 8) + '" fill="' + C_AXIS + '" font-size="13" text-anchor="middle">time (s)</text>'
@@ -514,9 +649,20 @@ function chartClient(D) {
   function segSvg(x, y1, y2, color, w) { return '<line x1="' + x.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="' + color + '" stroke-width="' + w + '"/>'; }
   function ttHead(t, speed) { return '<div class="tthead">t ' + t.toFixed(1) + 's · <span style="color:' + C_SPEED + '">speed ' + speed.toFixed(1) + ' m/s</span></div>'; }
   function nearestSq(series, t) { var best = series[0], bd = Infinity; for (var i = 0; i < series.length; i++) { var d = Math.abs(series[i].t - t); if (d < bd) { bd = d; best = series[i]; } } return best; }
-  function ttChaos(sw, name, p) {
-    return '<div><span class="ttsw" style="background:' + sw + '"></span>' + name + ' level <b>' + p.c.toFixed(1) + '</b> · chaos <b style="color:'
-      + hueMix(clamp(1 - p.per, 0, 1)) + '">' + p.chaos.toFixed(2) + '</b> dB · rhythm ' + (100 * p.per).toFixed(0) + '%</div>';
+  function ttSub(p) {
+    var floor = p.floor_db != null ? p.floor_db : p.level_db, d = p.level_db - floor, ch = clamp(p.chaos, 0, 1);
+    return '<div><span class="ttsw" style="background:' + hueMix(ch) + '"></span>sub-bass level <b>' + p.level_db.toFixed(1)
+      + '</b> · base ' + floor.toFixed(1) + ' · Δ <b style="color:' + (d > 0 ? "#ffd27a" : "#8fbf8f") + '">' + fmtD(d) + '</b> dB · tonality <b>'
+      + p.tonality.toFixed(2) + '</b> · chaos <b>' + p.chaos.toFixed(2) + '</b> (width ' + (ch * CHAOS_DISPLAY_DB).toFixed(1) + 'px)</div>';
+  }
+  function ttEvent(ev) {
+    var head = ttHead(eventMidT(ev), ev.speed_mps), rows = "", names = Object.keys(ev.tags || {});
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i], tg = ev.tags[name], gap = (ev.accel_gaps || []).indexOf(name) >= 0;
+      rows += '<div>' + esc(name) + ' <b>' + tg.value.toFixed(2) + '</b>&middot;' + tg.confidence.toFixed(2)
+        + (gap ? ' <span style="color:#ffb37a">(accelerometer gap)</span>' : '') + '</div>';
+    }
+    return head + rows;
   }
   function ttRow(sw, name, rec, base) {
     var d = rec - base;
@@ -542,62 +688,72 @@ function chartClient(D) {
     var t = view[0] + (sx - mL) / plotW * (view[1] - view[0]), hr = D.hires;
     var panel = null;
     if (sy >= mainTop && sy <= mainTop + mainH) panel = "main";
-    else if (bandsShown() && sy >= lowTop && sy <= lowTop + lowH) panel = "low";
-    else if (bandsShown() && sy >= mhTop && sy <= mhTop + mhH) panel = "mh";
+    else if (subShown() && sy >= subTop && sy <= subTop + subH) panel = "sub";
+    else if (lowMhShown() && sy >= lowTop && sy <= lowTop + lowH) panel = "low";
+    else if (lowMhShown() && sy >= mhTop && sy <= mhTop + mhH) panel = "mh";
     if (!panel) { hideHover(); return; }
 
     var GUIDE = "rgba(255,255,255,0.16)", marks, html, panelBottom, xS;
     if (panel === "main") {
-      var pi = nearestPtIdx(t), p = pts[pi]; xS = xf(p.t);
-      var rv = roughField(p), units = roughMode === "db" ? " dB above floor" : " / 100";
-      marks = segSvg(xS, mainTop, mainTop + mainH, GUIDE, 1) + dotSvg(xS, yS(p.speed), C_SPEED);
-      var rline;
-      if (envelopeOn) { // two lines drawn (faint raw + bold smoothed) — mark and report both
-        var sv = smoothedAt(pi);
-        marks += dotSvgSm(xS, yRough(rv), C_ROUGH) + dotSvg(xS, yRough(sv), C_ROUGH);
-        rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness smoothed <b>' + sv.toFixed(1)
-          + '</b> · raw ' + rv.toFixed(1) + units + ' (' + smoothW + 's avg)</div>';
+      var pb0 = mainTop + mainH;
+      var evMain = (sy >= pb0 - 9 && sy <= pb0 + 1) ? nearestEventNearX(sx) : null;
+      if (evMain) {
+        xS = xf(eventMidT(evMain));
+        marks = segSvg(xS, mainTop, pb0, GUIDE, 1) + dotSvg(xS, pb0 - 5, "#dcdcdc");
+        html = ttEvent(evMain);
       } else {
-        marks += dotSvg(xS, yRough(rv), C_ROUGH);
-        rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness <b>' + rv.toFixed(1) + '</b>' + units + '</div>';
+        var pi = nearestPtIdx(t), p = pts[pi]; xS = xf(p.t);
+        var rv = roughField(p), units = roughMode === "db" ? " dB above floor" : " / 100";
+        marks = segSvg(xS, mainTop, mainTop + mainH, GUIDE, 1) + dotSvg(xS, yS(p.speed), C_SPEED);
+        var rline;
+        if (envelopeOn) { // two lines drawn (faint raw + bold smoothed) — mark and report both
+          var sv = smoothedAt(pi);
+          marks += dotSvgSm(xS, yRough(rv), C_ROUGH) + dotSvg(xS, yRough(sv), C_ROUGH);
+          rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness smoothed <b>' + sv.toFixed(1)
+            + '</b> · raw ' + rv.toFixed(1) + units + ' (' + smoothW + 's avg)</div>';
+        } else {
+          marks += dotSvg(xS, yRough(rv), C_ROUGH);
+          rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness <b>' + rv.toFixed(1) + '</b>' + units + '</div>';
+        }
+        html = ttHead(p.t, p.speed) + rline;
+        if (hr && hr.lo) { // composition: which bands sit above baseline right here (~1 s avg)
+          var av = bandAvg(p.t - 0.5, p.t + 0.5);
+          html += '<div>' + dChip(C_LO, "low", av.lo - av.fl) + ' · ' + dChip(C_MI, "mid", av.mi - av.fm)
+            + ' · ' + dChip(C_HI, "high", av.hi - av.fh) + ' dB over base</div>';
+        }
       }
-      html = ttHead(p.t, p.speed) + rline;
-      if (hr && hr.lo) { // composition: which bands sit above baseline right here (~1 s avg)
-        var av = bandAvg(p.t - 0.5, p.t + 0.5);
-        html += '<div>' + dChip(C_LO, "low", av.lo - av.fl) + ' · ' + dChip(C_MI, "mid", av.mi - av.fm)
-          + ' · ' + dChip(C_HI, "high", av.hi - av.fh) + ' dB over base</div>';
+      panelBottom = pb0;
+    } else if (panel === "sub") {
+      var pbS = subTop + subH;
+      var evSub = (sy >= pbS - 9 && sy <= pbS + 1) ? nearestEventNearX(sx) : null;
+      if (evSub) {
+        xS = xf(eventMidT(evSub));
+        marks = segSvg(xS, subTop, pbS, GUIDE, 1) + dotSvg(xS, pbS - 5, "#dcdcdc");
+        html = ttEvent(evSub);
+      } else {
+        var sq = nearestSq(squelch.subbass, t); xS = xf(sq.t);
+        var floorS = sq.floor_db != null ? sq.floor_db : sq.level_db, ch = clamp(sq.chaos, 0, 1);
+        marks = segSvg(xS, subTop, pbS, GUIDE, 1) + segSvg(xS, yDbSub(sq.level_db), yDbSub(floorS), hueMix(ch), Math.max(0.6, ch * CHAOS_DISPLAY_DB))
+          + dotSvg(xS, yDbSub(floorS), C_SUBF) + dotSvg(xS, yDbSub(sq.level_db), hueMix(ch));
+        html = ttHead(sq.t, nearestPt(sq.t).speed) + ttSub(sq);
       }
-      panelBottom = mainTop + mainH;
+      panelBottom = pbS;
     } else if (panel === "low") {
-      if (ribbonOn && squelch) { // chaos view: level/chaos/rhythm at the nearest squelch point
-        var sqL = nearestSq(squelch.low, t); xS = xf(sqL.t);
-        marks = segSvg(xS, lowTop, lowTop + lowH, GUIDE, 1) + segSvg(xS, yDbLow(sqL.c + sqL.chaos), yDbLow(sqL.c - sqL.chaos), C_LO, 1.6) + dotSvg(xS, yDbLow(sqL.c), C_LO);
-        html = ttHead(sqL.t, nearestPt(sqL.t).speed) + ttChaos(C_LO, "low", sqL);
-      } else {
-        var sL = bandStride(), i = peakSnap(Math.round(hiresIdx(t) / sL) * sL, sL, [{ arr: hr.lo, base: hr.floLo }]);
-        var tS = hr.t0 + i * hr.dt; xS = xf(tS);
-        var rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec, sp = nearestPt(tS).speed;
-        marks = segSvg(xS, lowTop, lowTop + lowH, GUIDE, 1) + segSvg(xS, yDbLow(rec), yDbLow(base), C_LO, 1.4)
-          + dotSvg(xS, yDbLow(base), C_LOF) + dotSvg(xS, yDbLow(rec), C_LO);
-        html = ttHead(tS, sp) + ttRow(C_LO, "low", rec, base);
-      }
+      var sL = bandStride(), i = peakSnap(Math.round(hiresIdx(t) / sL) * sL, sL, [{ arr: hr.lo, base: hr.floLo }]);
+      var tS = hr.t0 + i * hr.dt; xS = xf(tS);
+      var rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec, sp = nearestPt(tS).speed;
+      marks = segSvg(xS, lowTop, lowTop + lowH, GUIDE, 1) + segSvg(xS, yDbLow(rec), yDbLow(base), C_LO, 1.4)
+        + dotSvg(xS, yDbLow(base), C_LOF) + dotSvg(xS, yDbLow(rec), C_LO);
+      html = ttHead(tS, sp) + ttRow(C_LO, "low", rec, base);
       panelBottom = lowTop + lowH;
     } else {
-      if (ribbonOn && squelch) {
-        var sqM = nearestSq(squelch.mid, t), sqH = nearestSq(squelch.high, t); xS = xf(sqM.t);
-        marks = segSvg(xS, mhTop, mhTop + mhH, GUIDE, 1)
-          + segSvg(xS, yDbMH(sqM.c + sqM.chaos), yDbMH(sqM.c - sqM.chaos), C_MI, 1.6) + dotSvg(xS, yDbMH(sqM.c), C_MI)
-          + segSvg(xS, yDbMH(sqH.c + sqH.chaos), yDbMH(sqH.c - sqH.chaos), C_HI, 1.6) + dotSvg(xS, yDbMH(sqH.c), C_HI);
-        html = ttHead(sqM.t, nearestPt(sqM.t).speed) + ttChaos(C_MI, "mid", sqM) + ttChaos(C_HI, "high", sqH);
-      } else {
-        var sM = bandStride(), j = peakSnap(Math.round(hiresIdx(t) / sM) * sM, sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]);
-        var tS2 = hr.t0 + j * hr.dt; xS = xf(tS2);
-        var mr = hr.mi[j], mb = hr.floMi ? hr.floMi[j] : mr, hrr = hr.hi[j], hb = hr.floHi ? hr.floHi[j] : hrr, sp2 = nearestPt(tS2).speed;
-        marks = segSvg(xS, mhTop, mhTop + mhH, GUIDE, 1)
-          + segSvg(xS, yDbMH(mr), yDbMH(mb), C_MI, 1.4) + dotSvg(xS, yDbMH(mb), C_MIF) + dotSvg(xS, yDbMH(mr), C_MI)
-          + segSvg(xS, yDbMH(hrr), yDbMH(hb), C_HI, 1.4) + dotSvg(xS, yDbMH(hb), C_HIF) + dotSvg(xS, yDbMH(hrr), C_HI);
-        html = ttHead(tS2, sp2) + ttRow(C_MI, "mid", mr, mb) + ttRow(C_HI, "high", hrr, hb);
-      }
+      var sM = bandStride(), j = peakSnap(Math.round(hiresIdx(t) / sM) * sM, sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]);
+      var tS2 = hr.t0 + j * hr.dt; xS = xf(tS2);
+      var mr = hr.mi[j], mb = hr.floMi ? hr.floMi[j] : mr, hrr = hr.hi[j], hb = hr.floHi ? hr.floHi[j] : hrr, sp2 = nearestPt(tS2).speed;
+      marks = segSvg(xS, mhTop, mhTop + mhH, GUIDE, 1)
+        + segSvg(xS, yDbMH(mr), yDbMH(mb), C_MI, 1.4) + dotSvg(xS, yDbMH(mb), C_MIF) + dotSvg(xS, yDbMH(mr), C_MI)
+        + segSvg(xS, yDbMH(hrr), yDbMH(hb), C_HI, 1.4) + dotSvg(xS, yDbMH(hb), C_HIF) + dotSvg(xS, yDbMH(hrr), C_HI);
+      html = ttHead(tS2, sp2) + ttRow(C_MI, "mid", mr, mb) + ttRow(C_HI, "high", hrr, hb);
       panelBottom = mhTop + mhH;
     }
     var g = s.querySelector("#hover");
@@ -617,21 +773,11 @@ function chartClient(D) {
 
   function updateBandsBtn() { if (bandsBtn) bandsBtn.textContent = bandsOn ? "Bands: on" : "Bands: off"; }
   if (bandsBtn) {
-    if (D.hires && D.hires.lo) {
+    if ((D.hires && D.hires.lo) || (squelch && squelch.subbass && squelch.subbass.length)) {
       bandsBtn.style.display = "";
       bandsBtn.addEventListener("click", function () { bandsOn = !bandsOn; updateBandsBtn(); render(); });
     } else {
       bandsBtn.style.display = "none";
-    }
-  }
-
-  function updateRibbonBtn() { if (ribbonBtn) ribbonBtn.textContent = ribbonOn ? "Band view: chaos" : "Band view: levels"; }
-  if (ribbonBtn) {
-    if (squelch) {
-      ribbonBtn.style.display = "";
-      ribbonBtn.addEventListener("click", function () { ribbonOn = !ribbonOn; updateRibbonBtn(); render(); });
-    } else {
-      ribbonBtn.style.display = "none";
     }
   }
 
@@ -663,13 +809,12 @@ function chartClient(D) {
   }
 
   updateBandsBtn();
-  updateRibbonBtn();
   updateRoughBtn();
   updatePlayBtn();
   render();
 }
 
-const data = { pts, anns, maxT, label, audioUrl, hires, bandsOn, envelopeOn, squelch };
+const data = { pts, anns, maxT, label, audioUrl, hires, bandsOn, envelopeOn, squelch, events: (tagsData && tagsData.events) || [] };
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
@@ -697,12 +842,11 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <button id="reset" type="button">Reset zoom (full pass)</button>
   <button id="roughmode" type="button" style="display:none">Rough: dB</button>
   <button id="bands" type="button" style="display:none">Bands: on</button>
-  <button id="ribbon" type="button" style="display:none">Band view: chaos</button>
   <span id="smoothctl" style="display:none;color:#dcdcdc;">smooth <input id="smooth" type="range" min="1" max="11" step="2" value="5" style="vertical-align:middle;width:120px"> <span id="smoothval" style="color:#9fb7d4;font-variant-numeric:tabular-nums">5s</span></span>
   <span id="range"></span>
 </div>
 <div class="toolbar">
-  <span class="hint">hover any panel to read exact values (level, baseline, &Delta;) in a tooltip below it &middot; full view: click to zoom to 30&nbsp;s &middot; zoomed: drag to pan, click to seek audio, double-click to reset &middot; Play sweeps a playhead (localhost only) and the zoomed view follows it.</span>
+  <span class="hint">hover any panel to read exact values (level, baseline, &Delta;) in a tooltip below it; hover the small dots along a panel's bottom edge for tag detail at that moment &middot; full view: click to zoom to 30&nbsp;s &middot; zoomed: drag to pan, click to seek audio, double-click to reset &middot; Play sweeps a playhead (localhost only) and the zoomed view follows it.</span>
 </div>
 <div id="chartwrap"><div id="chart"></div><div id="tt"></div></div>
 <div class="panel">
@@ -711,11 +855,13 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <div style="margin-top:.4rem"><span class="sw" style="background:rgba(255,192,77,0.4)"></span><b>faint amber</b> = per-frame roughness at <b>~47&nbsp;Hz</b> (the sub-second structure SP1 averages into each 1&nbsp;s point) &mdash; a narrow spike is a &lt;0.1&nbsp;s transient, a plateau is a sustained sound. Follows the current roughness scale (dB or linear).</div>
   <div style="margin-top:.4rem"><b>Envelope</b>: the bold roughness line is a centered moving average (temporal envelope) over the <b>smooth</b> width; the faint line under it is the raw 1&nbsp;s value. Widen the slider to collapse per-second jitter into a trend.</div>
   <div style="margin-top:.4rem"><b>Band panels</b> (dB, log/perceptual) &mdash; the road channel is kept in its own panel:
+       <span class="sw" style="background:#ebd73c"></span><b>sub-bass</b> 20&ndash;80&nbsp;Hz (folded, see below);
        <span class="sw" style="background:#5fd35f"></span><b>low</b> 80&ndash;250&nbsp;Hz = <b>road rumble</b> (clean of voices); below it,
        <span class="sw" style="background:#b98cff"></span>mid and <span class="sw" style="background:#ff7bac"></span>high = <b>voices + cargo rattle</b>. Toggle with <b>Bands</b>.</div>
   <div style="margin-top:.4rem"><span class="sw" style="background:#7cc47c;height:0;border-top:2px dashed #7cc47c"></span><b>Baseline (dashed)</b> = this car's computed <b>noise floor on smooth pavement at that instant's speed</b> &mdash; the per-band 10th-percentile floor from <b>this run's own</b> speed-conditioned baseline (varies car to car and trip to trip, but is the same on equally smooth roads at the same speed). It <b>rises with speed</b>: a faster stretch is louder even on glass-smooth asphalt.
        The <span style="color:#5fd35f"><b>shaded green gap</b></span> in the low panel is the <b>delta-dB</b> &mdash; how far the rumble sits <i>above</i> that baseline. That gap, weighted <b>low&nbsp;0.6&thinsp;/&thinsp;mid&nbsp;0.3&thinsp;/&thinsp;high&nbsp;0.1</b> across the three bands, <b>is the roughness number</b> on the main panel. Baseline flat + rumble flat = smooth road at 0&nbsp;dB delta; rumble lifting off the baseline = felt roughness.</div>
-  <div style="margin-top:.4rem"><b>Band view: chaos</b> (toggle) &mdash; replaces the picket fence with the <b>aperiodic-chaos ribbon</b>: the centre line is band level, the <b>ribbon width is chaos</b> (the envelope's spread with the periodic rhythm removed), and the <b>hue</b> runs <span style="color:#6f9bff">cool = tonal/rhythmic</span> (engine, habituated) &rarr; <span style="color:#ff7a5a">hot = noise-like</span> (road, novel/strobe-like). A loud but pinched cool bar is your engine; a wide hot bloom is the road. Squelch &tau; is band-specific (low 12.5&nbsp;ms, mid 4&nbsp;ms, high 1&nbsp;ms).</div>
+  <div style="margin-top:.4rem"><b>Folded sub-bass panel</b> (top band panel) &mdash; same baseline+delta grammar as low/mid/high, but the line itself is <b>folded</b> against tonal&rarr;chaos structure: hue runs <span style="color:#3a6fd8">blue = tonal</span> (engine, habituated) &rarr; <span style="color:#ebd73c">yellow = chaotic</span> (road, novel), and <b>thickness carries the same chaos value redundantly</b> (a thin line reads tonal even without colour, so the panel stays legible for colourblind viewers). Chaos here is spectral flatness (1&nbsp;&minus;&nbsp;tonality) within the 20&ndash;80&nbsp;Hz band, not amplitude spread.</div>
+  <div style="margin-top:.4rem"><span class="sw" style="background:#dcdcdc;opacity:.55"></span><b>tag-event dots</b> (bottom edge of the main and sub-bass panels) &mdash; one per detected sub-bass event; hover a dot for that event's tags (<code>name value&middot;confidence</code>), with an <span style="color:#ffb37a">accelerometer-gap</span> note where the onset-sharpness tag couldn't be corroborated.</div>
   <div style="margin-top:.4rem"><span class="sw" style="background:#ff7bac;height:8px"></span><b>pink ribbon (top)</b> = <b>likely talking</b>: windows where mid&nbsp;+&nbsp;high co-spike (the speech signature). Roughness there is contaminated by voices, not road.</div>
   <div style="margin-top:.5rem">Shaded bands are auto-detected: <span style="color:#9a9a9a">stops</span>,
       <span style="color:#ff785a">rough / saturated stretches</span>, and
