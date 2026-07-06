@@ -81,6 +81,19 @@ function buildBaselineSamples(scoredWindows, subbass) {
   return out;
 }
 
+// Real, reliability-weighted per-run sub-bass floor (RAW ENERGY, not dB), aligned 1:1 with
+// `subbass`, for the timeline to consume directly instead of re-fitting its own (Task 9
+// review fix: the timeline previously derived a second, unweighted baseline locally, which
+// could silently diverge from the floor the "level" tag already uses).
+function computeSubbassFloor(subbass, scoredWindows, baseline) {
+  return subbass.map((p) => {
+    const i = nearestIndex(scoredWindows, p.t, (w) => w.t);
+    if (i < 0) return null;
+    const floor = floorAt(baseline, "subbass", scoredWindows[i].speed);
+    return isFinite(floor) ? floor : null;
+  });
+}
+
 function attackSlope(subbass, event) {
   const pts = subbass.slice(event.i_start, event.i_end + 1);
   if (pts.length < 2) return null; // not computable -> tag skipped
@@ -170,6 +183,8 @@ function main() {
       tags, accel_gaps
     };
   });
+
+  sq.subbass_floor = computeSubbassFloor(sq.subbass, scoredWindows, baseline);
 
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "squelch-clean.json"), JSON.stringify(sq));
