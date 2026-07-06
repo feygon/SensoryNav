@@ -5,6 +5,14 @@ Status: **vision / direction** · First written 2026-07-05
 This records where SensoryNav is headed, so any single spec can be understood as one link in a
 chain rather than the whole product. It is intent, not a commitment to build all of it now.
 
+## Contents
+- [What the finished product does](#what-the-finished-product-does)
+- [Adoption strategy](#adoption-strategy)
+- [The chain, in build order](#the-chain-in-build-order)
+- [Privacy architecture (intent)](#privacy-architecture-intent)
+- [The accelerometer's role](#the-accelerometers-role)
+- [Provenance](#provenance)
+
 ## What the finished product does
 
 A rider who is sensory-sensitive uses a nav map that accounts for how a road *feels*, not just how

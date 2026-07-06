@@ -9,6 +9,14 @@ reason over to produce statements like *"Manhole: 74% — broadband, transient, 
 onset."* This document defines what a tag is, the metadata every tag carries, and the **specific
 methodology** for adding one (so tag selection cannot become a bikeshed).
 
+## Contents
+- [Why tags, not a scalar](#why-tags-not-a-scalar)
+- [Tag object schema](#tag-object-schema)
+- [Confidence semantics](#confidence-semantics)
+- [Inclusion methodology](#inclusion-methodology)
+- [Starter tag set (v0)](#starter-tag-set-v0)
+- [Relationship to the rest of the chain](#relationship-to-the-rest-of-the-chain)
+
 ## Why tags, not a scalar
 
 - **Interpretable substrate.** A classifier (human, heuristic, or LLM) reasons over named
@@ -51,7 +59,7 @@ the window (clipping / near-floor / speech contamination), the sharpness of the 
 measure (e.g. a strong spectral peak → high tonality confidence), and `accel_dependency` (a tag
 that `requires` accel is reported with capped audio-only confidence and a flag).
 
-## Inclusion methodology (governance — anti-bikeshed)
+## Inclusion methodology
 
 A tag is added **only** when all five hold. Aesthetic preference is not grounds; a discrimination
 result is.
@@ -71,7 +79,7 @@ result is.
 Deprecation follows the same rigor: a tag moves to `deprecated` with a recorded reason, never
 silently deleted.
 
-## Starter tag set (v0 — to be validated during implementation)
+## Starter tag set (v0)
 
 Derived from heuristics already written into `lib/squelch.js` and this session's analysis. Values
 and thresholds are placeholders pending the discrimination tests in the spec.
