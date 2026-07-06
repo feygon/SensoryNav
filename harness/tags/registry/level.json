@@ -1,0 +1,34 @@
+{
+  "name": "level",
+  "display": "Level",
+  "domain": "acoustics",
+  "definition": "Loudness above the run's own speed-conditioned smooth-road floor (delta-dB), per band.",
+  "indicators": [
+    "loudness above the speed-conditioned floor",
+    "delta-dB: 10*log10(window band energy / per-speed-conditioned floor energy)"
+  ],
+  "detection": {
+    "method": "delta-dB",
+    "band": "per-band (sub-bass/low/mid/high)",
+    "window_samples": "per-band (16384/2048/1024/512)",
+    "measure": "event median level_db minus floorAt(band, speed), normalised by LEVEL_NORM_DB=20 into [0,1]",
+    "provenance": "harness/score/baseline.js speed-conditioned floor; harness/score/roughness-db.js"
+  },
+  "value": {
+    "type": "ratio",
+    "unit": "0-1 (delta-dB / LEVEL_NORM_DB=20)",
+    "range": [0, 1]
+  },
+  "confidence": {
+    "model": "reliability_factor x measure_sharpness x accel_cap",
+    "basis": "delta-dB magnitude relative to the per-run noise floor; SNR of the window"
+  },
+  "accel_dependency": "none",
+  "status": "proposed",
+  "discrimination_test": {
+    "dataset": "jc-aggregate (5 passes)",
+    "claim": "typical smooth-road delta-dB vs worst rough-chop delta-dB",
+    "result": "median 2.2-2.7 dB (flat across 0-20 m/s) vs jc4 worst-chop 7-13 dB (peak 13.1 dB)"
+  },
+  "notes": "No idle-vs-driving delta-dB pair is recorded in the research (delta-dB is defined relative to each run's own per-speed floor, so an idle stop is close to 0 by construction - that is what 'stop goes quiet' means for tonality, not for level). The discrimination_test above uses the closest real figures: docs/2026-07-04-cross-pass-rough-spot-aggregation-findings.md's typical-vs-worst-chop delta-dB spread, which is the actual empirical evidence for this tag's loudness dimension."
+}

@@ -1,0 +1,35 @@
+{
+  "name": "tonality",
+  "display": "Tonality",
+  "domain": "harmonics",
+  "definition": "Narrow, stable spectral peaks (a harmonic comb) versus broadband noise; the primary discriminator between idle-tonal engine content and moving-rough broadband road content in the sub-bass band.",
+  "indicators": [
+    "narrow stable spectral peaks vs broadband",
+    "harmonic-to-noise ratio (HNR)",
+    "engine firing fundamental and low harmonics live below 80 Hz"
+  ],
+  "detection": {
+    "method": "peak-prominence",
+    "band": "sub-bass 20-80 Hz (first-class; adaptive window per band)",
+    "window_samples": 16384,
+    "measure": "HNR = sum(band-bin power where power > localMedian x PEAK_K) / sum(band-bin power), clamped [0,1]; PEAK_K=3",
+    "provenance": "sub-bass discovery, 2026-07-04 stop-vs-drive test; lib/squelch.js computeSpectralChaos"
+  },
+  "value": {
+    "type": "scalar",
+    "unit": "0-1",
+    "range": [0, 1]
+  },
+  "confidence": {
+    "model": "reliability_factor x measure_sharpness x accel_cap",
+    "basis": "peak margin (spectral peak prominence over local median); reliability capped 0 on clipping, near-floor, or speech contamination"
+  },
+  "accel_dependency": "none",
+  "status": "proposed",
+  "discrimination_test": {
+    "dataset": "jc4",
+    "claim": "idle>road",
+    "result": "0.78 vs 0.67"
+  },
+  "notes": "Adjacent 80-250 Hz 'low' band does NOT discriminate (0.72 vs 0.75, broadband either way) - this is why sub-bass is first-class. Near-silence (within BAND_SNR_MIN=6dB of the per-run noise floor) emits confidence 0 rather than a spurious high reading."
+}

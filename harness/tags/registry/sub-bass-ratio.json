@@ -1,0 +1,34 @@
+{
+  "name": "sub-bass-ratio",
+  "display": "Sub-bass ratio",
+  "domain": "acoustics",
+  "definition": "Fraction of total spectral energy concentrated in the sub-bass band (20-80 Hz) relative to the full band stack, indicating bass-heavy road/engine content versus broadband spread.",
+  "indicators": [
+    "energy concentrated 20-80 Hz vs above",
+    "band-power ratio across sub-bass/low/mid/high"
+  ],
+  "detection": {
+    "method": "band-power ratio",
+    "band": "sub-bass 20-80 Hz / (sub-bass+low+mid+high)",
+    "window_samples": 8192,
+    "measure": "subbass band energy divided by total band-stack energy",
+    "provenance": "lib/squelch.js computeSpectralChaos; docs/tags/tag-architecture.md starter set"
+  },
+  "value": {
+    "type": "ratio",
+    "unit": "0-1",
+    "range": [0, 1]
+  },
+  "confidence": {
+    "model": "reliability_factor x measure_sharpness x accel_cap",
+    "basis": "SNR of the sub-bass band relative to the per-run noise floor"
+  },
+  "accel_dependency": "none",
+  "status": "proposed",
+  "discrimination_test": {
+    "dataset": "pending-82nd-ave",
+    "claim": "sub-bass ratio separates bass-heavy chop (e.g. washboard/gravel) from broadband road noise",
+    "result": "TBD"
+  },
+  "notes": "Awaits the 82nd/39th Ave rough-road capture; not yet reproduced on the Johnson Creek passes."
+}

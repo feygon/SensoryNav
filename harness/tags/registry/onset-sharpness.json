@@ -1,0 +1,34 @@
+{
+  "name": "onset-sharpness",
+  "display": "Onset sharpness",
+  "domain": "acoustics",
+  "definition": "How fast an event's envelope attacks - impulsive/transient (e.g. pothole, manhole strike) versus a gradual swell (e.g. rumble strip, sustained texture).",
+  "indicators": [
+    "fast attack (impulsive) vs gradual swell",
+    "envelope attack time over a short window"
+  ],
+  "detection": {
+    "method": "envelope attack time",
+    "band": "sub-bass/low (short window)",
+    "window_samples": 2048,
+    "measure": "normalised attack slope of the event's chaos/energy rise",
+    "provenance": "docs/tags/tag-architecture.md starter set; lib/squelch.js envelope analysis"
+  },
+  "value": {
+    "type": "scalar",
+    "unit": "0-1 (normalised attack slope)",
+    "range": [0, 1]
+  },
+  "confidence": {
+    "model": "reliability_factor x measure_sharpness x accel_cap",
+    "basis": "attack-slope sharpness; accel_cap=0.6 since an accelerometer disambiguates a true impulsive vertical impact from an audio-only sharp attack (e.g. a slammed door)"
+  },
+  "accel_dependency": "disambiguates",
+  "status": "proposed",
+  "discrimination_test": {
+    "dataset": "pending-82nd-ave",
+    "claim": "onset-sharpness separates impulsive strikes (manhole/pothole) from gradual texture swells",
+    "result": "TBD"
+  },
+  "notes": "Awaits the 82nd/39th Ave rough-road capture with labeled impulsive events; not yet reproduced on the Johnson Creek passes."
+}
