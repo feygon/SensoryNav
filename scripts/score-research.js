@@ -3,7 +3,9 @@
 // flag talking windows (mid+high co-spike), EXCLUDE them from the speed-conditioned
 // baseline, then score every window with a RESEARCH band reweight (high de-emphasized:
 // cargo rattle + speech consonants, not road). Emits scored-clean.json + highres-clean.json
-// (per-band dB, dB-above-floor roughness, speech ranges) for plot-timeline.js.
+// (per-band dB, per-band speed-conditioned FLOOR dB, dB-above-floor roughness, speech
+// ranges) for plot-timeline.js. The floor arrays let the timeline draw the car's
+// smooth-pavement baseline under the live noise, so the gap reads as the delta-dB.
 // Usage: node scripts/score-research.js <sidecar.json> <outDir>
 "use strict";
 const fs = require("fs");
@@ -95,7 +97,10 @@ fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, "scored-clean.json"), JSON.stringify(scored, null, 2));
 
 // High-res trace against the SAME clean baseline (so the 1 Hz and 47 Hz lines align).
-const r = [], rdb = [], lo = [], mi = [], hi = [];
+// floLo/floMi/floHi are the per-band floor (this run's smooth-pavement baseline) in dB at
+// the frame's speed — the same floorAt() the roughness is measured against, so the timeline
+// can draw the baseline directly under the noise and the gap reads as the delta-dB.
+const r = [], rdb = [], lo = [], mi = [], hi = [], floLo = [], floMi = [], floHi = [];
 for (const f of frames) {
   const t = f.centerSample / sr;
   const wi = Math.min(Math.floor(t), sp2.length - 1);
@@ -106,6 +111,9 @@ for (const f of frames) {
   lo.push(+dB(f.energies.low).toFixed(1));
   mi.push(+dB(f.energies.mid).toFixed(1));
   hi.push(+dB(f.energies.high).toFixed(1));
+  floLo.push(+dB(scFloor("low")).toFixed(1));
+  floMi.push(+dB(scFloor("mid")).toFixed(1));
+  floHi.push(+dB(scFloor("high")).toFixed(1));
 }
 const t0 = frames.length ? +(frames[0].centerSample / sr).toFixed(4) : 0;
 const dt = +((CONSTANTS.FFT_SIZE / 2) / sr).toFixed(5);
@@ -115,7 +123,7 @@ for (const w of flagged) {
   if (speech.length && w === speech[speech.length - 1][1]) speech[speech.length - 1][1] = w + 1;
   else speech.push([w, w + 1]);
 }
-fs.writeFileSync(path.join(outDir, "highres-clean.json"), JSON.stringify({ t0, dt, r, rdb, lo, mi, hi, speech }));
+fs.writeFileSync(path.join(outDir, "highres-clean.json"), JSON.stringify({ t0, dt, r, rdb, lo, mi, hi, floLo, floMi, floHi, speech }));
 
 const agg = batch.aggregate;
 const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(p * (s.length - 1))] : NaN; };
