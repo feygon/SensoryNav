@@ -20,96 +20,86 @@ const flags = process.argv.slice(7);       // any of: bands, envelope
 const bandsOn = flags.includes("bands");   // start with the 3-band (dB) panel on
 const envelopeOn = flags.includes("envelope"); // bold smoothed roughness + faint raw
 
-let hires = null;
-if (hiresPath) {
-  try { hires = JSON.parse(fs.readFileSync(hiresPath, "utf8")); }
-  catch (e) { console.error("hires load failed:", e.message); }
-}
-
-// Optional folded sub-bass chaos+tonality series (from squelch-extract). Passed as a flag:
-//   squelch=out/score-XX/squelch-clean.json
-// Each point is { t, energy, level_db, tonality, chaos, peak_freqs, low_conf } (chaos = 1-tonality).
-let squelch = null;
+// ARCHITECTURE: this page is DATA-DRIVEN. The generator does NOT read the scored /
+// highres / squelch / tags JSON and bake it (or pre-rendered SVG) into the HTML. It
+// emits a small shell that FETCHES those JSON files at load time and builds every SVG
+// element in the browser (see buildData + chartClient below). The same JSON the
+// pipeline writes is the single source of truth. Pages are served from the repo root
+// by scripts/serve-out.js (localhost:8137), so these same-origin fetches resolve.
+//   squelch=out/score-XX/squelch-clean.json  — folded sub-bass panel + band levels
+//   tags=out/score-XX/tags-clean.json         — tag-event marks
 const squelchFlag = flags.find((f) => f.startsWith("squelch="));
-if (squelchFlag) {
-  try { squelch = JSON.parse(fs.readFileSync(squelchFlag.slice(8), "utf8")); }
-  catch (e) { console.error("squelch load failed:", e.message); }
-}
-
-// Optional tag-event marks (from squelch-extract's event tagger). Passed as a flag:
-//   tags=out/score-XX/tags-clean.json
-// { events: [{ t_start, t_end, lat, lon, speed_mps, tags: {name:{value,confidence}}, accel_gaps }] }
-let tagsData = null;
 const tagsFlag = flags.find((f) => f.startsWith("tags="));
-if (tagsFlag) {
-  try { tagsData = JSON.parse(fs.readFileSync(tagsFlag.slice(5), "utf8")); }
-  catch (e) { console.error("tags load failed:", e.message); }
-}
+const toUrl = (p) => (p ? "/" + String(p).replace(/\\/g, "/").replace(/^\/+/, "") : null);
+const urls = {
+  scored: toUrl(inPath),
+  hires: toUrl(hiresPath),
+  squelch: squelchFlag ? toUrl(squelchFlag.slice(8)) : null,
+  tags: tagsFlag ? toUrl(tagsFlag.slice(5)) : null
+};
 
-const scored = JSON.parse(fs.readFileSync(inPath, "utf8"));
-const t0 = scored[0].started_at_ms;
-const pts = scored.map((r) => ({
-  t: (r.started_at_ms - t0) / 1000, // seconds from pass start (== WAV seek time)
-  speed: r.speed_mps,
-  rough: r.roughness_raw,
-  rdb: r.roughness_db // weighted dB-above-floor; may be undefined for older scored files
-}));
-const maxT = pts[pts.length - 1].t;
+// ---- buildData: BROWSER function. Turns the fetched JSON (sources = {scored, hires,
+// squelch, tags}) into the `data` object chartClient renders. This is the derivation
+// that used to run server-side; it now runs in the page so the raw pipeline JSON — not
+// a pre-chewed copy — is what the HTML loads. Ported verbatim; do not change behavior.
+function buildData(sources, cfg) {
+  const scored = sources.scored, hires = sources.hires || null;
+  const squelch = sources.squelch || null, tags = sources.tags || null;
+  const t0 = scored[0].started_at_ms;
+  const pts = scored.map((r) => ({
+    t: (r.started_at_ms - t0) / 1000, // seconds from pass start (== WAV seek time)
+    speed: r.speed_mps,
+    rough: r.roughness_raw,
+    rdb: r.roughness_db // weighted dB-above-floor; may be undefined for older scored files
+  }));
+  const maxT = pts[pts.length - 1].t;
 
-// ---- fold the real, reliability-weighted sub-bass floor (from squelch-extract) into dB ----
-// squelch-extract now exports `subbass_floor` (RAW ENERGY, aligned 1:1 with `subbass`) — the
-// SAME per-run, speed-conditioned, reliability-weighted/talking-excluded baseline the "level"
-// tag already uses (harness/score/baseline.js#fitBaseline). Convert it to the panel's dB scale
-// the SAME way `level_db` itself is derived from `energy` (spectral-chaos.js: 10*log10(energy /
-// (N*N) + EPS)) so the dashed baseline and the live line share one scale. Do NOT re-fit a local
-// baseline here — that was the bug (Task 9 review fix): a second, unweighted, unexcluded local
-// fit could silently diverge from the real floor the tooltip numbers (from the "level" tag) use.
-const SUBBASS_DB_EPS = 1e-12;
-function subbassFftN(sq) {
-  const b = sq.params && sq.params.bands && sq.params.bands.find((x) => x.key === "subbass");
-  return b ? b.N : null;
-}
-if (squelch && squelch.subbass && squelch.subbass.length) {
-  const N = subbassFftN(squelch);
-  const floors = squelch.subbass_floor; // number[]|null[], same length as subbass, or absent (older squelch-clean.json)
-  if (N && Array.isArray(floors) && floors.length === squelch.subbass.length) {
-    squelch.subbass.forEach((p, i) => {
-      const f = floors[i];
-      p.floor_db = (f != null && isFinite(f)) ? +(10 * Math.log10(f / (N * N) + SUBBASS_DB_EPS)).toFixed(2) : null;
-    });
-  } else {
-    // Absent/mismatched (older squelch-clean.json without subbass_floor): draw the level line
-    // with no baseline shading rather than crashing or resurrecting a local re-fit.
-    squelch.subbass.forEach((p) => { p.floor_db = null; });
-  }
-  const lv = squelch.subbass.map((p) => p.level_db).concat(squelch.subbass.map((p) => p.floor_db).filter((x) => x != null));
-  squelch.scale = { sub: [Math.floor(Math.min.apply(null, lv)) - 3, Math.ceil(Math.max.apply(null, lv)) + 3] };
-}
-
-// ---- annotation detection (server-side data analysis) ----
-function runs(pred, minLen) {
-  const out = [];
-  let s = -1;
-  for (let i = 0; i <= pts.length; i++) {
-    const ok = i < pts.length && pred(pts[i]);
-    if (ok && s < 0) s = i;
-    else if (!ok && s >= 0) {
-      if (i - s >= minLen) out.push({ a: s, b: i - 1 });
-      s = -1;
+  // Fold the real, reliability-weighted sub-bass floor (squelch.subbass_floor, RAW ENERGY,
+  // aligned 1:1 with subbass) into dB the SAME way level_db is derived from energy
+  // (spectral-chaos.js: 10*log10(energy/(N*N)+EPS)) so the dashed baseline and the live line
+  // share one scale. Do NOT re-fit a local baseline (that was the Task 9 review bug).
+  const SUBBASS_DB_EPS = 1e-12;
+  if (squelch && squelch.subbass && squelch.subbass.length) {
+    const bnd = squelch.params && squelch.params.bands && squelch.params.bands.filter((x) => x.key === "subbass")[0];
+    const N = bnd ? bnd.N : null;
+    const floors = squelch.subbass_floor; // number[]|null[], same length as subbass, or absent (older file)
+    if (N && Array.isArray(floors) && floors.length === squelch.subbass.length) {
+      squelch.subbass.forEach((p, i) => {
+        const f = floors[i];
+        p.floor_db = (f != null && isFinite(f)) ? +(10 * Math.log10(f / (N * N) + SUBBASS_DB_EPS)).toFixed(2) : null;
+      });
+    } else {
+      squelch.subbass.forEach((p) => { p.floor_db = null; });
     }
+    const lv = squelch.subbass.map((p) => p.level_db).concat(squelch.subbass.map((p) => p.floor_db).filter((x) => x != null));
+    squelch.scale = { sub: [Math.floor(Math.min.apply(null, lv)) - 3, Math.ceil(Math.max.apply(null, lv)) + 3] };
   }
-  return out;
-}
-function longest(rs, n) {
-  return rs.slice().sort((p, q) => (q.b - q.a) - (p.b - p.a)).slice(0, n);
-}
-const anns = [
-  ...longest(runs((p) => p.speed < 1, 4), 3).map((r) => ({ ...r, kind: "stop" })),
-  ...longest(runs((p) => p.rough >= 99 && p.speed >= 2, 5), 3).map((r) => ({ ...r, kind: "rough" })),
-  ...longest(runs((p) => p.speed > 10 && p.rough < 12, 3), 3).map((r) => ({ ...r, kind: "cruise" }))
-].sort((p, q) => p.a - q.a);
 
-const satPct = (100 * pts.filter((p) => p.rough >= 99.99).length / pts.length).toFixed(0);
+  // annotation detection (auto stops / rough / cruise sections)
+  function runs(pred, minLen) {
+    const out = [];
+    let s = -1;
+    for (let i = 0; i <= pts.length; i++) {
+      const ok = i < pts.length && pred(pts[i]);
+      if (ok && s < 0) s = i;
+      else if (!ok && s >= 0) { if (i - s >= minLen) out.push({ a: s, b: i - 1 }); s = -1; }
+    }
+    return out;
+  }
+  function longest(rs, n) { return rs.slice().sort((p, q) => (q.b - q.a) - (p.b - p.a)).slice(0, n); }
+  const anns = longest(runs((p) => p.speed < 1, 4), 3).map((r) => ({ a: r.a, b: r.b, kind: "stop" }))
+    .concat(longest(runs((p) => p.rough >= 99 && p.speed >= 2, 5), 3).map((r) => ({ a: r.a, b: r.b, kind: "rough" })))
+    .concat(longest(runs((p) => p.speed > 10 && p.rough < 12, 3), 3).map((r) => ({ a: r.a, b: r.b, kind: "cruise" })))
+    .sort((p, q) => p.a - q.a);
+
+  const satPct = (100 * pts.filter((p) => p.rough >= 99.99).length / pts.length).toFixed(0);
+  const sp = document.getElementById("satpct");
+  if (sp) sp.textContent = satPct;
+
+  return { pts, anns, maxT, label: cfg.label, audioUrl: cfg.audioUrl,
+    hires, bandsOn: cfg.bandsOn, envelopeOn: cfg.envelopeOn, squelch,
+    events: (tags && tags.events) || [] };
+}
 
 // ---- client-side renderer + player (runs in the browser; embedded via toString) ----
 function chartClient(D) {
@@ -783,7 +773,6 @@ function chartClient(D) {
   render();
 }
 
-const data = { pts, anns, maxT, label, audioUrl, hires, bandsOn, envelopeOn, squelch, events: (tagsData && tagsData.events) || [] };
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
@@ -835,12 +824,32 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <div style="margin-top:.5rem">Shaded bands are auto-detected: <span style="color:#9a9a9a">stops</span>,
       <span style="color:#ff785a">rough / saturated stretches</span>, and
       <span style="color:#4da3ff">smooth-cruise sections</span>.</div>
-  <div style="margin-top:.5rem"><b>${satPct}%</b> of windows sit pinned at roughness 100 &mdash; the flat-top plateaus are the
+  <div style="margin-top:.5rem"><b id="satpct">…</b>% of windows sit pinned at roughness 100 &mdash; the flat-top plateaus are the
       <code>SCORE_SCALE</code> saturation to calibrate against felt annotations.</div>
 </div>
-<script>(${chartClient.toString()})(${JSON.stringify(data)});</script>
+<script>
+"use strict";
+var URLS = ${JSON.stringify(urls)}, CFG = ${JSON.stringify({ label, audioUrl, bandsOn, envelopeOn })};
+var chartClient = (${chartClient.toString()});
+var buildData = (${buildData.toString()});
+(function () {
+  var chart = document.getElementById("chart");
+  chart.innerHTML = '<div style="color:#9fb7d4;padding:1rem">Loading pass data…</div>';
+  var names = Object.keys(URLS);
+  Promise.all(names.map(function (n) {
+    if (!URLS[n]) return Promise.resolve(null);
+    return fetch(URLS[n]).then(function (r) { if (!r.ok) throw new Error(URLS[n] + " → HTTP " + r.status); return r.json(); });
+  })).then(function (vals) {
+    var s = {}; names.forEach(function (n, i) { s[n] = vals[i]; });
+    chartClient(buildData(s, CFG));
+  }).catch(function (e) {
+    chart.innerHTML = '<div style="color:#ff9b7a;padding:1rem;max-width:1100px">Could not load data: ' + e.message +
+      '. This page reads the pipeline JSON live — serve the repo root with <code>node scripts/serve-out.js</code> (localhost:8137) and open it from there.</div>';
+  });
+})();
+</script>
 </body></html>`;
 
 fs.writeFileSync(outPath, html);
-console.log("wrote", outPath, audioUrl ? "(audio: " + audioUrl + ")" : "(no audio)");
-console.log("annotations:", JSON.stringify(anns.map((r) => ({ kind: r.kind, from: pts[r.a].t, to: pts[r.b].t }))));
+console.log("wrote", outPath, "→ fetches", Object.values(urls).filter(Boolean).join(", "),
+  "(no data baked into the HTML)", audioUrl ? "| audio " + audioUrl : "");
