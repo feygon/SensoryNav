@@ -55,4 +55,11 @@ const narrowOnly = []; for (let i = 0; i < 25; i++) narrowOnly.push(mk(5 + i * 0
 assert.strictEqual(floorAt(fitBaseline(narrowOnly, { OVERLAP_TIERS: [[10, 0.25], [5, 0.50]] }), "low", 5),
   floorAt(fitBaseline(narrowOnly, {}), "low", 5), "narrow bin (span<5) unaffected by overlap tiers");
 
+// sub-bass band participates in floor fitting
+const sb = [];
+for (let i = 0; i < 25; i++) sb.push({ speed: 5, subbass: 2 + i * 0.04, low: 1, mid: 1, high: 1, reliability: 1 });
+const bsb = fitBaseline(sb, { MIN_BIN_SAMPLES: 20 });
+assert.ok(floorAt(bsb, "subbass", 5) > 1.5 && floorAt(bsb, "subbass", 5) < 2.6, `subbass floor@5=${floorAt(bsb, "subbass", 5)}`);
+assert.strictEqual(baselineMeta(bsb).subbass.qualified_bins, 1);
+
 console.log("score-baseline tests passed");

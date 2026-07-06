@@ -7,7 +7,7 @@ const { weightedQuantile } = require("./metrics");
 // samples — but only for bins whose span exceeds the threshold. First matching tier wins,
 // so order most-specific first. Default off (null) preserves the hard-bin behaviour.
 const DEFAULTS = { SPEED_BIN_MPS: 2.0, FLOOR_Q: 0.10, MIN_BIN_SAMPLES: 20, EPS_FLOOR: 1e-6, OVERLAP_TIERS: null };
-const BANDS = ["low", "mid", "high"];
+const BANDS = ["subbass", "low", "mid", "high"];
 
 // Fraction to widen a bin of the given speed span, per the tier table (first match wins).
 function overlapFraction(span, tiers) {
@@ -85,6 +85,10 @@ function floorAt(baseline, band, speed) {
 }
 
 function globalFloorAt(baseline, band) { return baseline[band].global; }
-function baselineMeta(baseline) { return { low: baseline.low.meta, mid: baseline.mid.meta, high: baseline.high.meta }; }
+function baselineMeta(baseline) {
+  const meta = {};
+  for (const band of BANDS) meta[band] = baseline[band].meta;
+  return meta;
+}
 
 module.exports = { fitBaseline, floorAt, globalFloorAt, baselineMeta };
