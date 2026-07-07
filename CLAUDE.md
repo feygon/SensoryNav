@@ -24,3 +24,18 @@ dark-mode by default with no pure-white surfaces.
 
 When either shared asset (`theme.js`, `styles.css`) changes, bump the `?v=` query
 string on **every** page that references it, so cached clients pick up the change.
+
+## Reuse before you build — the module inventory
+
+**Before creating any page, renderer, generator, shared helper, or browser/worker module,
+read [`docs/viz-architecture.md`](docs/viz-architecture.md) and reuse or extend what's already
+there instead of writing a second copy.** (The failure this prevents: rebuilding `drawRibbon`
+instead of calling it.) The inventory lists the shared page shell (`scripts/lib/viz-page.js`),
+the ribbon renderer (`ribbon-render.js` / `window.SensoryNavRibbon.drawRibbon`), the page
+generators, and the browser-capable pipeline/recorder modules (`window`/`self.SensoryNav*`).
+
+If the existing piece is *close but not identical*, extract the shared part into a module and
+have both callers use it — do not fork a copy. New reusable module? Follow the conventions
+(shared build helpers in `scripts/lib/`; a `window`/`self.SensoryNav*` global for browser/worker
+code), then regenerate: `node scripts/generate-viz-inventory.js`. The inventory is **derived
+from the code — do not hand-edit it.**
