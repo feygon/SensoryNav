@@ -1,0 +1,40 @@
+/* analyze.css — Local Analysis upload page. Follows the shared theme (styles.css / theme.js):
+   light-default, dark via html.dark-mode body. No pure-white surfaces in dark mode. */
+
+body { max-width: 900px; }
+.analyze { font-size: 16px; line-height: 1.5; }
+.analyze h1 { font-size: 30px; margin: 0 0 2px; }
+.analyze .sub { color: #555; margin: 0 0 20px; font-size: 15px; }
+html.dark-mode body .analyze .sub { color: #a8b0ba; }
+
+.drops { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 620px) { .drops { grid-template-columns: 1fr; } }
+
+.drop {
+  display: block; text-align: center; cursor: pointer;
+  background: #f2f2f2; border: 2px dashed #bcbcbc; border-radius: 12px; padding: 22px 16px;
+  transition: border-color .12s, background .12s;
+}
+.drop:hover, .drop.over { border-color: #4da3ff; background: #eaf3ff; }
+html.dark-mode body .drop { background: #1b1b1b; border-color: #555; }
+html.dark-mode body .drop:hover, html.dark-mode body .drop.over { border-color: #4da3ff; background: #17263a; }
+.drop .ico { font-size: 30px; line-height: 1; }
+.drop .t { font-weight: 700; margin: 8px 0 2px; font-size: 15px; }
+.drop .d { color: #666; font-size: 13px; }
+html.dark-mode body .drop .d { color: #9aa2ac; }
+
+.status { color: #b23; font-size: 14px; min-height: 1.2em; margin: 4px 0; }
+html.dark-mode body .status { color: #ff8a6a; }
+
+.card { background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 14px 18px; }
+html.dark-mode body .card { background: #1b1b1b; border-color: #555; }
+.card h2 { font-size: 16px; margin: 0 0 10px; }
+.card table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.card th { text-align: left; color: #666; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top; width: 130px; }
+html.dark-mode body .card th { color: #9aa2ac; }
+.card td { padding: 3px 0; font-variant-numeric: tabular-nums; }
+.card .note { color: #666; font-size: 13px; margin: 12px 0 0; }
+html.dark-mode body .card .note { color: #9aa2ac; }
+
+.foot { color: #666; font-size: 13px; margin-top: 18px; }
+html.dark-mode body .foot { color: #9aa2ac; }

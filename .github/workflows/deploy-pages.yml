@@ -41,8 +41,8 @@ jobs:
 
           # 2. Assemble the deployable web subset (explicit allowlist).
           rm -rf _site && mkdir _site
-          for f in index.html capture.html links.html tingles.html tingles-mufasa.html \
-                   styles.css capture.css theme.js app.js capture.js capture-worklet.js \
+          for f in index.html capture.html analyze.html links.html tingles.html tingles-mufasa.html \
+                   styles.css capture.css analyze.css theme.js app.js capture.js analyze.js capture-worklet.js \
                    build.json project-entry.json; do
             [ -f "src/$f" ] && cp -- "src/$f" _site/
           done

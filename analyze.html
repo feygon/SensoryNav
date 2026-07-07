@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>SensoryNav — Local Analysis</title>
+  <link rel="stylesheet" href="styles.css?v=0.2.6">
+  <link rel="stylesheet" href="analyze.css?v=0.2.6">
+  <script src="theme.js?v=0.2.6"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site">
+    <a href="index.html">Home</a>
+    <a href="capture.html">Capture</a>
+    <a href="analyze.html" aria-current="page">Analyze</a>
+    <button type="button" class="theme-button" data-theme-toggle></button>
+  </nav>
+
+  <div class="analyze">
+    <h1>Local Analysis</h1>
+    <p class="sub">Drop in a capture — a <code>.wav</code> and its <code>.json</code> sidecar — to analyze it. This runs entirely in your browser; <strong>nothing is uploaded</strong>.</p>
+
+    <div class="drops">
+      <label class="drop" id="wav-drop" for="wav-input">
+        <div class="ico">🎧</div>
+        <div class="t">Audio</div>
+        <div class="d">Drop or choose a <code>.wav</code></div>
+        <input type="file" id="wav-input" accept=".wav,audio/wav" hidden>
+      </label>
+      <label class="drop" id="json-drop" for="json-input">
+        <div class="ico">🧾</div>
+        <div class="t">Sidecar</div>
+        <div class="d">Drop or choose the <code>.json</code></div>
+        <input type="file" id="json-input" accept=".json,application/json" hidden>
+      </label>
+    </div>
+
+    <p id="status" class="status" aria-live="polite"></p>
+    <section id="summary" class="card" hidden aria-live="polite"></section>
+
+    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The full on-device scoring pipeline — spectral-chaos, roughness, tags, and the timeline you see on the Capture page — is being ported to run here in the browser next; for now this reads and checks the pair locally.</p>
+  </div>
+
+  <script src="analyze.js"></script>
+</body>
+</html>
