@@ -1,0 +1,79 @@
+/* capture.css — dashboard chrome for the Capture & Pipeline page.
+   Follows the shared theme (styles.css / theme.js): light-default, dark via html.dark-mode body.
+   No pure-white surfaces in dark mode. */
+
+body { max-width: 1240px; }
+.dash { font-size: 16px; line-height: 1.5; }
+.dash h1 { font-size: 30px; margin: 0 0 2px; }
+.dash .sub { color: #555; margin: 0 0 20px; font-size: 15px; }
+html.dark-mode body .dash .sub { color: #a8b0ba; }
+
+.card { background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 16px 18px; margin: 0; }
+html.dark-mode body .card { background: #1b1b1b; border-color: #555; }
+.card h2 { font-size: 17px; margin: 0 0 12px; }
+.card .hint { color: #666; font-size: 13.5px; }
+html.dark-mode body .card .hint { color: #9aa2ac; }
+
+/* architecture strip: client -> analysis -> upload -> aggregator(planned) -> corpus */
+.arch { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-bottom: 22px; }
+.tier { flex: 1 1 150px; min-width: 140px; background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 12px 13px; position: relative; }
+html.dark-mode body .tier { background: #1b1b1b; border-color: #555; }
+.tier .ico { font-size: 22px; line-height: 1; }
+.tier .t { font-weight: 700; margin: 6px 0 2px; font-size: 14.5px; }
+.tier .d { color: #666; font-size: 12.5px; }
+html.dark-mode body .tier .d { color: #9aa2ac; }
+.tier .arrow { position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: #9aa2ac; font-size: 18px; z-index: 1; }
+.tier.live { border-left: 3px solid #5fd35f; }          /* green = live */
+.tier.planned { border-left: 3px solid #ebd73c; border-style: dashed; opacity: .82; } /* yellow dashed = planned */
+.badge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; border-radius: 999px; padding: 1px 8px; vertical-align: middle; margin-left: 6px; }
+.badge.live { background: rgba(95, 211, 95, .16); color: #2e8b2e; }
+html.dark-mode body .badge.live { background: rgba(95, 211, 95, .18); color: #7ee07e; }
+.badge.planned { background: rgba(235, 215, 60, .18); color: #8a7400; }
+html.dark-mode body .badge.planned { background: rgba(235, 215, 60, .16); color: #ebd73c; }
+
+/* top grid: recorder card + stat tiles */
+.grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(260px, .8fr); gap: 16px; margin-bottom: 22px; }
+@media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
+.tile { background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 12px 14px; }
+html.dark-mode body .tile { background: #1b1b1b; border-color: #555; }
+.tile .n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile .k { color: #666; font-size: 12.5px; margin-top: 2px; }
+html.dark-mode body .tile .k { color: #9aa2ac; }
+
+/* recorder controls inside the card */
+.rec label { display: block; font-size: 13px; color: #555; margin: 10px 0 3px; }
+html.dark-mode body .rec label { color: #a8b0ba; }
+.rec input[type=text] { width: 100%; font: inherit; font-size: 15px; padding: 7px 9px; border: 1px solid #bbb; border-radius: 7px; background: #fff; color: #111; }
+html.dark-mode body .rec input[type=text] { background: #111; color: #eee; border-color: #666; }
+.controls { display: flex; gap: 10px; margin: 14px 0 6px; }
+.controls button { font: inherit; font-size: 15px; padding: 8px 16px; border-radius: 7px; border: 1px solid #bbb; background: #e6e6e6; color: #111; cursor: pointer; }
+.controls button:hover:not(:disabled) { background: #dcdcdc; }
+.controls button:disabled { opacity: .5; cursor: default; }
+html.dark-mode body .controls button { background: #2a2a2a; color: #eee; border-color: #666; }
+#level { width: 100%; height: 14px; }
+.warning { color: #b23; font-weight: 600; }
+html.dark-mode body .warning { color: #ff8a6a; }
+
+/* optional privacy trims — checkboxes with a hover/focus tooltip */
+.trim-opts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 4px 0 2px; }
+.trim-opt { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: #555; cursor: pointer; }
+html.dark-mode body .trim-opt { color: #c8ced6; }
+.trim-opt input { width: 16px; height: 16px; }
+.trim-opt .tipmark { color: #4da3ff; font-size: 12px; opacity: .65; }
+.trim-opt:hover .tipmark, .trim-opt:focus-within .tipmark { opacity: 1; }
+.trim-opt[data-tip]:hover::after, .trim-opt[data-tip]:focus-within::after {
+  content: attr(data-tip); position: absolute; left: 0; top: 100%; margin-top: 6px; z-index: 20;
+  width: min(360px, 82vw); background: #111; color: #dcdcdc; border: 1px solid #777; border-radius: 6px;
+  padding: 8px 11px; font-size: 12.5px; line-height: 1.5; white-space: normal;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+
+/* sample viz panel */
+.vizhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.vizhead h2 { margin: 0 0 8px; font-size: 17px; }
+.vizhead a { font-size: 14px; }
+.viz-frame { width: 100%; height: 860px; border: 1px solid #cfcfcf; border-radius: 10px; background: #1a1a1a; }
+html.dark-mode body .viz-frame { border-color: #555; }
+.foot { color: #666; font-size: 13px; margin-top: 10px; }
+html.dark-mode body .foot { color: #9aa2ac; }

@@ -60,7 +60,9 @@
       gps: document.getElementById("gps"),
       notes: document.getElementById("notes"),
       label: document.getElementById("label"),
-      warning: document.getElementById("warning")
+      warning: document.getElementById("warning"),
+      trimStart: document.getElementById("trim-start"),
+      trimEnd: document.getElementById("trim-end")
     };
     ui.start.addEventListener("click", onStart);
     ui.stop.addEventListener("click", onStop);
@@ -196,26 +198,49 @@
 
   function finalizeAndExport(reason) {
     stopStreams();
+
+    // Optional deidentifying trims, applied HERE so the removed audio + GPS never reach a
+    // saved file. If a checked trim would leave nothing, warn and save nothing (saving the
+    // untrimmed capture would leak exactly what the user asked to remove).
+    const dropFirstSec = ui.trimStart && ui.trimStart.checked ? 30 : 0;
+    const dropLastSec = ui.trimEnd && ui.trimEnd.checked ? 30 : 0;
+    let src = {
+      frames: state.frames,
+      totalSamples: state.totalSamples,
+      sampleRate: state.sampleRate,
+      recordingStartMs: state.recordingStartMs,
+      audioFirstFrameMs: state.audioFirstFrameMs,
+      gpsSamples: state.gpsSamples
+    };
+    if (dropFirstSec || dropLastSec) {
+      const trimmed = core.trimCapture(src, { dropFirstSec, dropLastSec });
+      if (trimmed === null) {
+        ui.warning.textContent = "Recording too short to remove " + (dropFirstSec + dropLastSec) + " s — nothing was saved.";
+        return;
+      }
+      src = trimmed;
+    }
+
     const label = (ui.label.value || state.baseLabel) + "-" + state.passTimestamp;
     const wavName = label + ".wav";
-    const wav = core.encodeWav(state.frames, state.totalSamples, state.sampleRate);
+    const wav = core.encodeWav(src.frames, src.totalSamples, src.sampleRate);
     const manifest = core.buildManifest({
       pass_label: label,
       wav_filename: wavName,
-      recording_start_ms: state.recordingStartMs,
-      audio_first_frame_ms: state.audioFirstFrameMs,
-      total_samples: state.totalSamples,
-      sample_rate: state.sampleRate,
+      recording_start_ms: src.recordingStartMs,
+      audio_first_frame_ms: src.audioFirstFrameMs,
+      total_samples: src.totalSamples,
+      sample_rate: src.sampleRate,
       partial: reason !== null,
       truncation_reason: reason,
       notes: ui.notes.value,
       audio_settings_requested: REQUESTED_AUDIO,
       audio_settings_applied: state.appliedSettings,
       user_agent: navigator.userAgent,
-      gps_samples: state.gpsSamples,
-      observed_fix_hz: core.observedFixHz(state.gpsSamples)
+      gps_samples: src.gpsSamples,
+      observed_fix_hz: core.observedFixHz(src.gpsSamples)
     });
-    if (state.gpsSamples.length === 0) {
+    if (src.gpsSamples.length === 0) {
       ui.warning.textContent = WARNINGS.noGps;
     }
     downloadBlob(new Blob([wav], { type: "audio/wav" }), wavName);
