@@ -42,11 +42,10 @@
     <p id="analysis-status" class="astatus" aria-live="polite"></p>
     <section id="chart" class="chart" hidden aria-label="Spectral-chaos analysis"></section>
 
-    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The audio is decoded and scored <strong>on your device</strong> (in a background worker): speed (from GPS), speed-conditioned roughness, and the sub-bass/low/mid/high spectral-chaos. Event tags are the next layer.</p>
+    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The audio is decoded and scored <strong>on your device</strong> (in a background worker) into the spectral-chaos ribbon — the same view as a scored research pass. Speed, roughness, and event tags are the next layer.</p>
   </div>
 
-  <script src="harness/score/metrics.js"></script>
-  <script src="harness/score/baseline.js"></script>
+  <script src="ribbon-render.js"></script>
   <script src="analyze.js"></script>
 </body>
 </html>

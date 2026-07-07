@@ -42,8 +42,9 @@ function toUrl(p) {
 //             sources = { name: parsedJson|null }, mount = the #chart element.
 // Returns the HTML string.
 function buildPage(opts) {
-  const { title, headCss = "", bodyTop = "", bodyBottom = "", urls, config = {}, clientFn } = opts;
+  const { title, headCss = "", bodyTop = "", bodyBottom = "", urls, config = {}, clientFn, scripts = [] } = opts;
   if (!urls || typeof clientFn !== "function") throw new Error("buildPage: urls and clientFn are required");
+  const scriptTags = scripts.map((s) => `<script src="${s}"></script>`).join("\n");
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark"><title>${esc(title)}</title>
@@ -53,6 +54,7 @@ ${bodyTop}
 <div id="chart"></div>
 <div id="err" role="alert"></div>
 ${bodyBottom}
+${scriptTags}
 <script>
 "use strict";
 var URLS = ${JSON.stringify(urls)}, CONFIG = ${JSON.stringify(config)};
