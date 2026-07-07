@@ -42,11 +42,15 @@ jobs:
           # 2. Assemble the deployable web subset (explicit allowlist).
           rm -rf _site && mkdir _site
           for f in index.html capture.html analyze.html links.html tingles.html tingles-mufasa.html \
-                   styles.css capture.css analyze.css theme.js app.js capture.js analyze.js capture-worklet.js \
+                   styles.css capture.css analyze.css theme.js app.js capture.js analyze.js analyze-worker.js capture-worklet.js \
                    build.json project-entry.json; do
             [ -f "src/$f" ] && cp -- "src/$f" _site/
           done
           if [ -d src/recorder ]; then mkdir -p _site/recorder && cp src/recorder/*.js _site/recorder/; fi
+          # analysis pipeline modules the worker loads (importScripts, relative to site root)
+          mkdir -p _site/harness/audio _site/harness/score
+          cp src/harness/audio/wav-decoder.js _site/harness/audio/
+          cp src/harness/score/spectral-chaos.js _site/harness/score/
           [ -d src/assets ] && cp -r src/assets _site/
           [ -d src/sample ] && cp -r src/sample _site/
           touch _site/.nojekyll # serve files as-is, no Jekyll processing

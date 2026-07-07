@@ -36,5 +36,13 @@ html.dark-mode body .card th { color: #9aa2ac; }
 .card .note { color: #666; font-size: 13px; margin: 12px 0 0; }
 html.dark-mode body .card .note { color: #9aa2ac; }
 
+.astatus { color: #2f7fd6; font-size: 14px; min-height: 1.2em; margin: 10px 0 4px; }
+html.dark-mode body .astatus { color: #7fbaff; }
+
+.chart { background: #141414; border: 1px solid #333; border-radius: 10px; padding: 14px 16px; margin-top: 8px; }
+.chart h2 { color: #dcdcdc; font-size: 16px; margin: 0 0 10px; }
+.chart svg { display: block; }
+.chart .cnote { color: #9aa2ac; font-size: 13px; margin: 12px 0 0; }
+
 .foot { color: #666; font-size: 13px; margin-top: 18px; }
 html.dark-mode body .foot { color: #9aa2ac; }

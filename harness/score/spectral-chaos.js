@@ -85,4 +85,9 @@ function computeSpectralChaos(samples, fs, opts) {
   for (const b of SBANDS) out[b.key] = bandSeries(samples, fs, b, hopN);
   return out;
 }
-module.exports = { fft, hann, powerSpectrum, SBANDS, tonality, PEAK_K, median, computeSpectralChaos, BAND_SNR_MIN };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { fft, hann, powerSpectrum, SBANDS, tonality, PEAK_K, median, computeSpectralChaos, BAND_SNR_MIN };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

@@ -9,7 +9,9 @@
     wavDrop: document.getElementById("wav-drop"),
     jsonDrop: document.getElementById("json-drop"),
     summary: document.getElementById("summary"),
-    status: document.getElementById("status")
+    status: document.getElementById("status"),
+    analysisStatus: document.getElementById("analysis-status"),
+    chart: document.getElementById("chart")
   };
   const picked = { wav: null, json: null };
 
@@ -73,7 +75,7 @@
     }
     el.summary.innerHTML = "<h2>Local read</h2>" +
       "<table>" + rows.map((r) => "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td></tr>").join("") + "</table>" +
-      "<p class=\"note\">Read entirely in your browser — nothing was uploaded. Full scoring (the spectral-chaos timeline shown on the Capture page) runs next, on-device; that pipeline is in progress.</p>";
+      "<p class=\"note\">Read entirely in your browser — nothing was uploaded. Spectral-chaos analysis runs below, on-device; speed-conditioned roughness and event tags are the next layer.</p>";
     el.summary.hidden = false;
   }
 
@@ -82,7 +84,74 @@
     const r = new FileReader();
     r.onload = () => { try { picked.wav.header = parseWavHeader(r.result); } catch (e) { picked.wav.error = e.message; } render(); };
     r.onerror = () => { picked.wav.error = "could not read file"; render(); };
-    r.readAsArrayBuffer(file.slice(0, 4096)); // header only — no need to read the whole audio
+    r.readAsArrayBuffer(file.slice(0, 4096)); // header first (quick summary) — full decode happens in the worker
+    startAnalysis(file);
+  }
+
+  // --- decode + score on-device, in a worker so a long capture doesn't freeze the page ---
+  let worker = null;
+  function startAnalysis(file) {
+    el.chart.hidden = true;
+    el.analysisStatus.textContent = "Decoding and scoring on your device… (a long capture can take a few seconds)";
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        if (worker) worker.terminate();
+        worker = new Worker("analyze-worker.js");
+        worker.onmessage = (ev) => {
+          const d = ev.data;
+          if (!d.ok) { el.analysisStatus.textContent = "Could not analyze the audio: " + d.error; return; }
+          el.analysisStatus.textContent = "";
+          renderChart(d.squelch);
+        };
+        worker.onerror = (ev) => { el.analysisStatus.textContent = "Analysis error: " + (ev.message || "worker failed to load"); };
+        worker.postMessage({ wav: r.result }, [r.result]); // transfer the buffer, no copy
+      } catch (e) { el.analysisStatus.textContent = "Analysis unavailable in this browser: " + e.message; }
+    };
+    r.onerror = () => { el.analysisStatus.textContent = "Could not read the audio file for analysis."; };
+    r.readAsArrayBuffer(file);
+  }
+
+  // tonal (blue) -> chaotic (yellow); CVD-safe, thickness carries chaos too
+  function hue(tonality) {
+    const t = Math.max(0, Math.min(1, 1 - (tonality == null ? 0.5 : tonality)));
+    const a = [58, 111, 216], b = [235, 215, 60];
+    return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
+  }
+  function renderChart(sq) {
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const BANDS = [
+      { key: "subbass", label: "sub-bass 20–80 Hz", line: "#ebd73c" },
+      { key: "low", label: "low 80–250 Hz", line: "#5fd35f" },
+      { key: "mid", label: "mid 250–1000 Hz", line: "#b98cff" },
+      { key: "high", label: "high 1000–4000 Hz", line: "#ff7bac" }
+    ].filter((b) => sq[b.key] && sq[b.key].length);
+    const CHAOS_DB = 8, W = 1180, mL = 54, mR = 16, plotW = W - mL - mR, top0 = 18, hP = 116, gap = 40;
+    const H = top0 + BANDS.length * (hP + gap);
+    const parts = ['<rect width="' + W + '" height="' + H + '" fill="#141414"/>'];
+    BANDS.forEach((band, bi) => {
+      const pts = sq[band.key], top = top0 + bi * (hP + gap);
+      let dmin = Infinity, dmax = -Infinity;
+      pts.forEach((p) => { const hw = (p.chaos || 0) * CHAOS_DB; dmin = Math.min(dmin, p.level_db - hw); dmax = Math.max(dmax, p.level_db + hw); });
+      dmin -= 2; dmax += 2;
+      const maxT = pts[pts.length - 1].t || 1, x = (t) => mL + (t / maxT) * plotW, y = (db) => top + hP * (1 - (db - dmin) / (dmax - dmin)), bw = Math.max(1, plotW / pts.length);
+      for (let db = Math.ceil(dmin / 10) * 10; db <= dmax; db += 10) {
+        parts.push('<line x1="' + mL + '" y1="' + y(db).toFixed(1) + '" x2="' + (mL + plotW) + '" y2="' + y(db).toFixed(1) + '" stroke="#333" stroke-width="0.6"/>');
+        parts.push('<text x="' + (mL - 6) + '" y="' + (y(db) + 3).toFixed(1) + '" fill="#888" font-size="10" text-anchor="end">' + db + "</text>");
+      }
+      let line = "";
+      pts.forEach((p) => {
+        const hw = (p.chaos || 0) * CHAOS_DB, yt = y(p.level_db + hw), yb = y(p.level_db - hw);
+        parts.push('<rect x="' + (x(p.t) - bw / 2).toFixed(2) + '" y="' + yt.toFixed(1) + '" width="' + bw.toFixed(2) + '" height="' + Math.max(0.4, yb - yt).toFixed(1) + '" fill="' + hue(p.tonality) + '" opacity="0.5"/>');
+        line += x(p.t).toFixed(1) + "," + y(p.level_db).toFixed(1) + " ";
+      });
+      parts.push('<polyline fill="none" stroke="' + band.line + '" stroke-width="1.2" points="' + line.trim() + '"/>');
+      parts.push('<text x="' + mL + '" y="' + (top - 5) + '" fill="#dcdcdc" font-size="11">' + esc(band.label) + " &middot; level (dB), ribbon width = chaos, hue tonal&rarr;chaos</text>");
+    });
+    el.chart.innerHTML = "<h2>Spectral-chaos analysis</h2>" +
+      '<svg viewBox="0 0 ' + W + " " + H + '" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto" font-family="system-ui,sans-serif">' + parts.join("") + "</svg>" +
+      '<p class="cnote">Computed on-device from your audio. Hue: <span style="color:#3a6fd8">tonal</span> (engine/steady) &rarr; <span style="color:#ebd73c">chaotic</span> (road/broadband); line thickness carries chaos too.</p>';
+    el.chart.hidden = false;
   }
   function readJson(file) {
     picked.json = { name: file.name };

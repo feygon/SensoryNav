@@ -38,4 +38,9 @@ function decodeWav(bytes) {
   return { sampleRate, channels, bitDepth, sampleCount, samples };
 }
 
-module.exports = { decodeWav };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { decodeWav };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

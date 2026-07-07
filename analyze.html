@@ -39,7 +39,10 @@
     <p id="status" class="status" aria-live="polite"></p>
     <section id="summary" class="card" hidden aria-live="polite"></section>
 
-    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The full on-device scoring pipeline — spectral-chaos, roughness, tags, and the timeline you see on the Capture page — is being ported to run here in the browser next; for now this reads and checks the pair locally.</p>
+    <p id="analysis-status" class="astatus" aria-live="polite"></p>
+    <section id="chart" class="chart" hidden aria-label="Spectral-chaos analysis"></section>
+
+    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The audio is decoded and scored <strong>on your device</strong> (in a background worker) — the sub-bass 20–80 Hz chaos metric plus low/mid/high. Speed-conditioned roughness and event tags are the next layer.</p>
   </div>
 
   <script src="analyze.js"></script>
