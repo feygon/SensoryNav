@@ -50,7 +50,7 @@ jobs:
           # analysis pipeline modules the worker loads (importScripts, relative to site root)
           mkdir -p _site/harness/audio _site/harness/score
           cp src/harness/audio/wav-decoder.js _site/harness/audio/
-          cp src/harness/score/spectral-chaos.js _site/harness/score/
+          cp src/harness/score/spectral-chaos.js src/harness/score/baseline.js src/harness/score/metrics.js _site/harness/score/
           [ -d src/assets ] && cp -r src/assets _site/
           [ -d src/sample ] && cp -r src/sample _site/
           touch _site/.nojekyll # serve files as-is, no Jekyll processing

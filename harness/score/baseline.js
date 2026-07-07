@@ -1,6 +1,9 @@
 // harness/score/baseline.js
 "use strict";
-const { weightedQuantile } = require("./metrics");
+// Node loads ./metrics via require; in the browser it's on self.SensoryNavScore (metrics.js loads
+// first). `var` (not const/let) so it can coexist with metrics.js's global function of the same
+// name when both are loaded as classic <script>s in one shared global scope.
+var { weightedQuantile } = (typeof require !== "undefined") ? require("./metrics") : self.SensoryNavScore;
 
 // OVERLAP_TIERS: opt-in. Each [spanThreshold, fraction] widens a bin's floor-estimation
 // speed range by `fraction` of the bin's own span on EACH side, pulling in neighbour
@@ -102,4 +105,9 @@ function baselineMeta(baseline) {
   return meta;
 }
 
-module.exports = { fitBaseline, floorAt, globalFloorAt, baselineMeta };
+// Dual-mode: Node via module.exports; browser via self.SensoryNavScore.
+{
+  const exported = { fitBaseline, floorAt, globalFloorAt, baselineMeta };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

@@ -100,4 +100,9 @@ function bestF1Threshold(scores, labels, weights) {
   return best;
 }
 
-module.exports = { quantile, weightedQuantile, spearman, weightedSpearman, rocAuc, precisionRecall, bestF1Threshold };
+// Dual-mode: Node via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { quantile, weightedQuantile, spearman, weightedSpearman, rocAuc, precisionRecall, bestF1Threshold };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

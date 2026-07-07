@@ -75,7 +75,7 @@
     }
     el.summary.innerHTML = "<h2>Local read</h2>" +
       "<table>" + rows.map((r) => "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td></tr>").join("") + "</table>" +
-      "<p class=\"note\">Read entirely in your browser — nothing was uploaded. Spectral-chaos analysis runs below, on-device; speed-conditioned roughness and event tags are the next layer.</p>";
+      "<p class=\"note\">Read entirely in your browser — nothing was uploaded. Speed, roughness, and spectral-chaos are computed below, on-device; event tags are the next layer.</p>";
     el.summary.hidden = false;
   }
 
@@ -89,7 +89,7 @@
   }
 
   // --- decode + score on-device, in a worker so a long capture doesn't freeze the page ---
-  let worker = null;
+  let worker = null, lastSquelch = null;
   function startAnalysis(file) {
     el.chart.hidden = true;
     el.analysisStatus.textContent = "Decoding and scoring on your device… (a long capture can take a few seconds)";
@@ -102,7 +102,8 @@
           const d = ev.data;
           if (!d.ok) { el.analysisStatus.textContent = "Could not analyze the audio: " + d.error; return; }
           el.analysisStatus.textContent = "";
-          renderChart(d.squelch);
+          lastSquelch = d.squelch;
+          renderAnalysis();
         };
         worker.onerror = (ev) => { el.analysisStatus.textContent = "Analysis error: " + (ev.message || "worker failed to load"); };
         worker.postMessage({ wav: r.result }, [r.result]); // transfer the buffer, no copy
@@ -118,7 +119,7 @@
     const a = [58, 111, 216], b = [235, 215, 60];
     return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
   }
-  function renderChart(sq) {
+  function renderChart(sq, scored) {
     const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const BANDS = [
       { key: "subbass", label: "sub-bass 20–80 Hz", line: "#ebd73c" },
@@ -126,15 +127,33 @@
       { key: "mid", label: "mid 250–1000 Hz", line: "#b98cff" },
       { key: "high", label: "high 1000–4000 Hz", line: "#ff7bac" }
     ].filter((b) => sq[b.key] && sq[b.key].length);
-    const CHAOS_DB = 8, W = 1180, mL = 54, mR = 16, plotW = W - mL - mR, top0 = 18, hP = 116, gap = 40;
-    const H = top0 + BANDS.length * (hP + gap);
-    const parts = ['<rect width="' + W + '" height="' + H + '" fill="#141414"/>'];
-    BANDS.forEach((band, bi) => {
-      const pts = sq[band.key], top = top0 + bi * (hP + gap);
+    const CHAOS_DB = 8, W = 1180, mL = 54, mR = 16, plotW = W - mL - mR, hP = 116, gap = 40;
+    const maxT = sq.subbass[sq.subbass.length - 1].t || 1, x = (t) => mL + (t / maxT) * plotW;
+    const parts = [];
+    let top = 18;
+
+    // speed + speed-conditioned roughness — the main-panel view, when a GPS sidecar is present
+    if (scored && scored.length) {
+      const hM = 150;
+      const spMax = Math.max(2, Math.max.apply(null, scored.map((p) => p.speed)));
+      const rs = scored.map((p) => p.rdb), rMin = Math.min.apply(null, rs), rMax = Math.max(rMin + 1, Math.max.apply(null, rs));
+      const yS = (v) => top + hM * (1 - v / spMax), yR = (v) => top + hM * (1 - (v - rMin) / (rMax - rMin));
+      let sp = "", rl = "";
+      scored.forEach((p) => { sp += x(p.t).toFixed(1) + "," + yS(p.speed).toFixed(1) + " "; rl += x(p.t).toFixed(1) + "," + yR(p.rdb).toFixed(1) + " "; });
+      parts.push('<polyline fill="none" stroke="#ffc04d" stroke-width="1" opacity="0.9" points="' + rl.trim() + '"/>');
+      parts.push('<polyline fill="none" stroke="#4da3ff" stroke-width="1.4" points="' + sp.trim() + '"/>');
+      parts.push('<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + hM + '" fill="none" stroke="#888" stroke-width="0.8"/>');
+      parts.push('<text x="' + mL + '" y="' + (top - 5) + '" fill="#dcdcdc" font-size="11"><tspan fill="#4da3ff">speed</tspan> (m/s, ' + spMax.toFixed(0) + ' max) &middot; <tspan fill="#ffc04d">roughness</tspan> (dB above the speed-conditioned floor)</text>');
+      top += hM + gap;
+    }
+
+    // spectral-chaos band ribbons
+    BANDS.forEach((band) => {
+      const pts = sq[band.key];
       let dmin = Infinity, dmax = -Infinity;
       pts.forEach((p) => { const hw = (p.chaos || 0) * CHAOS_DB; dmin = Math.min(dmin, p.level_db - hw); dmax = Math.max(dmax, p.level_db + hw); });
       dmin -= 2; dmax += 2;
-      const maxT = pts[pts.length - 1].t || 1, x = (t) => mL + (t / maxT) * plotW, y = (db) => top + hP * (1 - (db - dmin) / (dmax - dmin)), bw = Math.max(1, plotW / pts.length);
+      const y = (db) => top + hP * (1 - (db - dmin) / (dmax - dmin)), bw = Math.max(1, plotW / pts.length);
       for (let db = Math.ceil(dmin / 10) * 10; db <= dmax; db += 10) {
         parts.push('<line x1="' + mL + '" y1="' + y(db).toFixed(1) + '" x2="' + (mL + plotW) + '" y2="' + y(db).toFixed(1) + '" stroke="#333" stroke-width="0.6"/>');
         parts.push('<text x="' + (mL - 6) + '" y="' + (y(db) + 3).toFixed(1) + '" fill="#888" font-size="10" text-anchor="end">' + db + "</text>");
@@ -147,16 +166,56 @@
       });
       parts.push('<polyline fill="none" stroke="' + band.line + '" stroke-width="1.2" points="' + line.trim() + '"/>');
       parts.push('<text x="' + mL + '" y="' + (top - 5) + '" fill="#dcdcdc" font-size="11">' + esc(band.label) + " &middot; level (dB), ribbon width = chaos, hue tonal&rarr;chaos</text>");
+      top += hP + gap;
     });
-    el.chart.innerHTML = "<h2>Spectral-chaos analysis</h2>" +
-      '<svg viewBox="0 0 ' + W + " " + H + '" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto" font-family="system-ui,sans-serif">' + parts.join("") + "</svg>" +
-      '<p class="cnote">Computed on-device from your audio. Hue: <span style="color:#3a6fd8">tonal</span> (engine/steady) &rarr; <span style="color:#ebd73c">chaotic</span> (road/broadband); line thickness carries chaos too.</p>';
+
+    const H = top;
+    el.chart.innerHTML = "<h2>Analysis" + (scored && scored.length ? " — speed, roughness &amp; spectral-chaos" : " — spectral-chaos") + "</h2>" +
+      '<svg viewBox="0 0 ' + W + " " + H + '" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto" font-family="system-ui,sans-serif"><rect width="' + W + '" height="' + H + '" fill="#141414"/>' + parts.join("") + "</svg>" +
+      '<p class="cnote">Computed on-device from your audio' + (scored && scored.length ? " + GPS" : "") + '. Ribbon hue: <span style="color:#3a6fd8">tonal</span> (engine/steady) &rarr; <span style="color:#ebd73c">chaotic</span> (road/broadband); thickness carries chaos too.' +
+      (scored && scored.length ? " Roughness is the low&nbsp;0.6&thinsp;/&thinsp;mid&nbsp;0.3&thinsp;/&thinsp;high&nbsp;0.1 weighted dB above this run's own speed-conditioned floor." : " Drop the .json sidecar too for speed + roughness.") + "</p>";
     el.chart.hidden = false;
+  }
+
+  function renderAnalysis() {
+    if (!lastSquelch) return;
+    const sidecar = picked.json && picked.json.obj;
+    renderChart(lastSquelch, sidecar ? computeScored(lastSquelch, sidecar) : null);
+  }
+
+  // speed (from the GPS sidecar) + speed-conditioned roughness = weighted delta-dB of band energy
+  // above the per-run fitted floor. Reuses the SAME baseline fit as the Node scorer.
+  function computeScored(sq, sidecar) {
+    const S = window.SensoryNavScore || {};
+    if (!S.fitBaseline || !sq.subbass || !sq.subbass.length) return null;
+    const fixes = sidecar.gps_samples || [], t0 = sidecar.audio_first_frame_ms;
+    if (t0 == null || fixes.length < 2) return null;
+    const spd = [];
+    fixes.forEach((f) => { if (f.speed_mps != null && isFinite(f.speed_mps)) { const s = Math.round((f.captured_at_ms - t0) / 1000); if (s >= 0) spd[s] = f.speed_mps; } });
+    const speedAt = (t) => { const s = Math.floor(t); for (let k = 0; k <= 4; k++) { if (spd[s - k] != null) return spd[s - k]; if (spd[s + k] != null) return spd[s + k]; } return null; };
+    const N = sq.subbass.length, samples = [];
+    for (let i = 0; i < N; i++) { const sp = speedAt(sq.subbass[i].t); if (sp == null) continue; samples.push({ speed: sp, subbass: sq.subbass[i].energy, low: sq.low[i].energy, mid: sq.mid[i].energy, high: sq.high[i].energy, reliability: 1 }); }
+    if (samples.length < 20) return null;
+    let baseline;
+    try { baseline = S.fitBaseline(samples, {}); } catch (e) { return null; }
+    const WTS = [["low", 0.6], ["mid", 0.3], ["high", 0.1]], out = [];
+    for (let i = 0; i < N; i++) {
+      const sp = speedAt(sq.subbass[i].t); if (sp == null) continue;
+      let rdb = 0;
+      for (let k = 0; k < WTS.length; k++) { const band = WTS[k][0], floor = S.floorAt(baseline, band, sp); rdb += WTS[k][1] * (10 * Math.log10((sq[band][i].energy + 1e-12) / (floor + 1e-12))); }
+      out.push({ t: sq.subbass[i].t, speed: sp, rdb: +rdb.toFixed(2) });
+    }
+    return out.length ? out : null;
   }
   function readJson(file) {
     picked.json = { name: file.name };
     const r = new FileReader();
-    r.onload = () => { try { picked.json.info = summarizeSidecar(JSON.parse(r.result)); } catch (e) { picked.json.error = "not valid JSON"; } render(); };
+    r.onload = () => {
+      try { picked.json.obj = JSON.parse(r.result); picked.json.info = summarizeSidecar(picked.json.obj); }
+      catch (e) { picked.json.error = "not valid JSON"; }
+      render();
+      renderAnalysis(); // add speed + roughness now that the sidecar is here
+    };
     r.onerror = () => { picked.json.error = "could not read file"; render(); };
     r.readAsText(file);
   }
