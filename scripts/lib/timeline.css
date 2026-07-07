@@ -1,0 +1,43 @@
+/* Timeline research-viz stylesheet. Shipped next to each generated timeline HTML by
+   scripts/plot-timeline.js (copied into the output directory), and linked relatively so it
+   resolves both on the local server and under a GitHub Pages project base. Dark-mode only:
+   these are self-contained research artifacts. */
+:root { color-scheme: dark; }
+body { background: #1a1a1a; color: #dcdcdc; font-family: system-ui, sans-serif; margin: 1.2rem; }
+
+.toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: .6rem; }
+.toolbar button { background: #333; color: #dcdcdc; border: 1px solid #666; border-radius: 5px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.toolbar button:hover { background: #444; }
+#play { min-width: 92px; }
+#range { color: #9fb7d4; font-variant-numeric: tabular-nums; }
+.hint { color: #888; font-size: .9rem; }
+
+#chartwrap { position: relative; max-width: 1240px; }
+#chart { max-width: 1240px; }
+
+/* hover tooltip on the chart panels */
+#tt { position: absolute; display: none; pointer-events: none; background: #111; color: #dcdcdc; border: 1px solid #666; border-radius: 5px; padding: 6px 9px; font-size: 12px; line-height: 1.5; white-space: nowrap; box-shadow: 0 3px 12px rgba(0, 0, 0, .55); z-index: 5; font-variant-numeric: tabular-nums; }
+#tt .tthead { color: #9fb7d4; margin-bottom: 2px; }
+#tt .ttsw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+
+/* legend / glossary panels — side by side on wide displays, stacked when narrow */
+.panel { background: #555; padding: .8rem 1rem; border-radius: 6px; max-width: 1240px; margin-top: 1rem; line-height: 1.5; }
+.legendwrap { display: flex; flex-wrap: wrap; gap: 1rem; max-width: 1240px; margin-top: 1rem; }
+.legendwrap .panel { margin-top: 0; flex: 1 1 460px; min-width: 0; }
+.panel h3 { margin: 0 0 .55rem; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #cfe0f5; }
+.sw { display: inline-block; width: 22px; height: 3px; vertical-align: middle; margin-right: 6px; }
+code { background: #666; padding: 0 4px; border-radius: 3px; }
+
+/* one-line glossary entries, detail revealed on hover/focus */
+.gloss .glz { position: relative; padding: 3px 0; cursor: help; }
+.gloss .glz .more { color: #cfe0f5; font-size: 11px; margin-left: 5px; opacity: .6; }
+.gloss .glz:hover .more,
+.gloss .glz:focus .more { opacity: 1; }
+.gloss .glz[data-tip]:hover::after,
+.gloss .glz[data-tip]:focus::after {
+  content: attr(data-tip); position: absolute; left: 0; top: 100%; margin-top: 5px;
+  background: #111; color: #dcdcdc; border: 1px solid #777; border-radius: 6px;
+  padding: 8px 11px; font-size: 12px; line-height: 1.55; white-space: normal;
+  width: min(560px, 88vw); box-shadow: 0 8px 24px rgba(0, 0, 0, .6); z-index: 30;
+}
+.gloss .glz[data-tip]:focus { outline: 2px solid #4da3ff; outline-offset: 2px; border-radius: 3px; }
