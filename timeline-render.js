@@ -35,7 +35,7 @@ function buildData(sources, cfg) {
       squelch.subbass.forEach((p) => { p.floor_db = null; });
     }
     const lv = squelch.subbass.map((p) => p.level_db).concat(squelch.subbass.map((p) => p.floor_db).filter((x) => x != null));
-    squelch.scale = { sub: [Math.floor(Math.min.apply(null, lv)) - 3, Math.ceil(Math.max.apply(null, lv)) + 3] };
+    squelch.scale = { sub: [Math.floor(Math.min.apply(null, lv) / 5) * 5, Math.ceil(Math.max.apply(null, lv) / 5) * 5] };
   }
 
   // annotation detection (auto stops / rough / cruise sections)
@@ -75,13 +75,13 @@ function chartClient(D) {
   var subTop = mainTop + mainH + gap, subH = 110;    // folded sub-bass panel (tonal->chaos hue + chaos width)
   var lowTop = subTop + subH + gap, lowH = 110;      // low (road) panel
   var mhTop = lowTop + lowH + gap, mhH = 130;        // mid + high (voices + cargo) panel
-  var SPEED_MAX = 20, ROUGH_MAX = 100, ROUGHDB_MAX = 16;
+  var SPEED_MAX = 20, ROUGH_MAX = 100, ROUGHDB_MAX = 20;
   var C_SPEED = "#4da3ff", C_ROUGH = "#ffc04d", C_TEXT = "#dcdcdc", C_GRID = "#444", C_AXIS = "#888", C_BG = "#1a1a1a", C_HEAD = "#f5f5f5";
   var C_LO = "#5fd35f", C_MI = "#b98cff", C_HI = "#ff7bac"; // low/mid/high band energy (dB)
   var C_LOF = "#7cc47c", C_MIF = "#8f7ab8", C_HIF = "#b87a92"; // baseline (floor) dashed lines — dimmer band hues
   var C_SUBF = "#6f7f9f"; // sub-bass baseline (dashed) — neutral blue-gray, distinct from the tonal->chaos ramp
-  var LOW_DB = [-42, -20];  // low panel dB range (road rumble), level view
-  var MH_DB = [-72, -25];   // mid/high panel dB range, level view
+  var LOW_DB = [-45, -20];  // low panel dB range (road rumble), level view — snapped to 5s
+  var MH_DB = [-75, -25];   // mid/high panel dB range, level view — snapped to 5s
   var CHAOS_DISPLAY_DB = 8; // sub-bass folded line: stroke-width = chaos * CHAOS_DISPLAY_DB (redundant, CVD-safe channel)
   var BAND = {
     stop:   { fill: "rgba(150,150,150,0.14)", edge: "#9a9a9a", label: "stop" },
@@ -141,7 +141,7 @@ function chartClient(D) {
   function yDbLow(db) { var r = lowRange(); return lowTop + lowH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
   function yDbMH(db) { var r = mhRange(); return mhTop + mhH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
   function yDbSub(db) { var r = subRange(); return subTop + subH * (1 - (clamp(db, r[0], r[1]) - r[0]) / (r[1] - r[0])); }
-  function niceTicks(r) { var a = r[0], b = r[1], rd = function (v) { return Math.round(v / 2) * 2; }; return [rd(a + (b - a) * 0.18), rd((a + b) / 2), rd(a + (b - a) * 0.82)]; }
+  function niceTicks(r) { var a = r[0], b = r[1], rd = function (v) { return Math.round(v / 5) * 5; }; return [rd(a + (b - a) * 0.18), rd((a + b) / 2), rd(a + (b - a) * 0.82)]; }
   function step(span) { return span <= 40 ? 5 : span <= 120 ? 15 : span <= 300 ? 30 : 60; }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
@@ -381,14 +381,14 @@ function chartClient(D) {
       lg += '<text x="' + (mL - 8) + '" y="' + (py + 4).toFixed(1) + '" fill="' + C_SPEED + '" font-size="12" text-anchor="end">' + v + '</text>';
     }
     // roughness (right) ticks — main panel
-    var rg = "", vr, rmax = roughMode === "db" ? ROUGHDB_MAX : ROUGH_MAX, rstep = roughMode === "db" ? 4 : 25;
+    var rg = "", vr, rmax = roughMode === "db" ? ROUGHDB_MAX : ROUGH_MAX, rstep = roughMode === "db" ? 5 : 25;
     for (vr = 0; vr <= rmax; vr += rstep) {
       var pyr = yRough(vr);
       rg += '<text x="' + (mL + plotW + 10) + '" y="' + (pyr + 4).toFixed(1) + '" fill="' + C_ROUGH + '" font-size="12" text-anchor="start">' + vr + '</text>';
     }
     // band panels when shown: folded SUB-BASS (chaos), then LOW (road), then MID+HIGH (voices + cargo)
     var bandPanel = "";
-    function panelScaffold(top, h, ticks, yfn, labelHtml) {
+    function panelScaffold(top, h, ticks, yfn, labelHtml, tip) {
       var out = "";
       for (var di = 0; di < ticks.length; di++) {
         var yd = yfn(ticks[di]);
@@ -396,18 +396,21 @@ function chartClient(D) {
         out += '<text x="' + (mL - 8) + '" y="' + (yd + 4).toFixed(1) + '" fill="' + C_AXIS + '" font-size="11" text-anchor="end">' + ticks[di] + '</text>';
       }
       out += '<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + h + '" fill="none" stroke="' + C_AXIS + '" stroke-width="1"/>';
-      out += '<text x="' + mL + '" y="' + (top - 8) + '" fill="' + C_TEXT + '" font-size="12">' + labelHtml + '</text>';
+      out += '<text x="' + mL + '" y="' + (top - 8) + '" fill="' + C_TEXT + '" font-size="12" style="cursor:help">' + (tip ? '<title>' + esc(tip) + '</title>' : '') + labelHtml + '</text>';
       return out;
     }
     if (showSub) {
       bandPanel += panelScaffold(subTop, subH, niceTicks(subRange()), yDbSub,
-        '<tspan fill="#ebd73c" font-weight="600">sub-bass</tspan> 20-80 Hz (folded, dB) &mdash; hue <tspan fill="#3a6fd8">tonal</tspan>&rarr;<tspan fill="#ebd73c">chaos</tspan>, thickness = chaos &middot; dashed = own speed-conditioned baseline, shaded gap = delta-dB');
+        '<tspan fill="#ebd73c" font-weight="600">sub-bass</tspan> 20-80 Hz (folded, dB) &mdash; hue <tspan fill="#3a6fd8">tonal</tspan>&rarr;<tspan fill="#ebd73c">chaos</tspan>, thickness = chaos &middot; dashed = own speed-conditioned baseline, shaded gap = delta-dB',
+        "Sub-bass 20–80 Hz, where the engine's firing fundamental lives — folded into one line. Y-position is the band level (dB). The line's hue runs blue (tonal/periodic, e.g. a steady engine tone) to yellow (chaotic/broadband — road, gravel, impacts) and its thickness also grows with chaos, so it stays readable without colour. The dashed line is this run's own smooth-pavement baseline at the current speed; the shaded gap above it is the delta-dB. This is the make-or-break 'a stop goes quiet' channel.");
     }
     if (showLowMh) {
       bandPanel += panelScaffold(lowTop, lowH, [-40, -30, -20], yDbLow,
-        '<tspan fill="' + C_LO + '" font-weight="600">low</tspan> 80-250 Hz &mdash; road rumble (dB) &middot; <tspan fill="' + C_LOF + '">dashed = smooth-road baseline</tspan>, shaded gap = delta-dB');
+        '<tspan fill="' + C_LO + '" font-weight="600">low</tspan> 80-250 Hz &mdash; road rumble (dB) &middot; <tspan fill="' + C_LOF + '">dashed = smooth-road baseline</tspan>, shaded gap = delta-dB',
+        "Low band 80–250 Hz — road rumble, kept clear of voices. The solid line is the band level (dB); the dashed line is this run's speed-conditioned smooth-road baseline; the shaded green gap between them is the delta-dB (how far the rumble sits above the floor). That gap, weighted low 0.6, is most of the roughness number.");
       bandPanel += panelScaffold(mhTop, mhH, [-65, -50, -35], yDbMH,
-        '<tspan fill="' + C_MI + '" font-weight="600">mid</tspan> 250-1k &nbsp;<tspan fill="' + C_HI + '" font-weight="600">high</tspan> 1-4k Hz &mdash; voices + cargo (dB) &middot; dashed = baseline');
+        '<tspan fill="' + C_MI + '" font-weight="600">mid</tspan> 250-1k &nbsp;<tspan fill="' + C_HI + '" font-weight="600">high</tspan> 1-4k Hz &mdash; voices + cargo (dB) &middot; dashed = baseline',
+        "Mid (250 Hz–1 kHz) and high (1–4 kHz) — where voices, wind, and cargo rattle live, so they are weighted down (mid 0.3, high 0.1) rather than counted as road. Solid lines are band levels (dB); dashed lines are each band's smooth-road baseline. Windows where mid and high co-spike are flagged as likely talking (the pink ribbon at the top of the main panel).");
     }
     // annotation bands (main panel) + staggered labels
     var bandsSvg = "", labels = "", row = 0;
@@ -428,7 +431,7 @@ function chartClient(D) {
     var cursor = isZoomed() ? "grab" : "crosshair";
     var svg = '<svg id="svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" font-family="system-ui,sans-serif" style="max-width:100%;height:auto;cursor:' + cursor + '">'
       + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="' + C_BG + '"/>'
-      + '<text x="' + mL + '" y="26" fill="' + C_TEXT + '" font-size="17" font-weight="600">' + esc(D.label) + ' — speed &amp; roughness over time</text>'
+      + '<text x="' + mL + '" y="26" fill="' + C_TEXT + '" font-size="17" font-weight="600" style="cursor:help"><title>' + esc("Speed (blue, m/s, left axis) and felt roughness (amber, right axis) across the whole pass. Roughness is the decibels a 1-second window sits above this car's own speed-conditioned smooth-road floor, weighted across bands (low 0.6 / mid 0.3 / high 0.1). Shaded regions are auto-detected stop / rough / cruise sections; ticks along the bottom edge mark tagged acoustic events.") + '</title>' + esc(D.label) + ' — speed &amp; roughness over time</text>'
       + bandsSvg + xg + lg + rg + bandPanel
       + '<rect x="' + mL + '" y="' + mainTop + '" width="' + plotW + '" height="' + mainH + '" fill="none" stroke="' + C_AXIS + '" stroke-width="1"/>'
       + hiresLine() + line("speed", C_SPEED) + roughDraw() + eventMarks(mainTop, mainTop + mainH)

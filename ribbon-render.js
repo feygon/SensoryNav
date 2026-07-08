@@ -23,6 +23,12 @@
       { key: "high", label: "high 1000–4000 Hz", line: "#ff7bac" }
     ].filter((b) => sq[b.key] && sq[b.key].length);
     const CHAOS_DB = 8; // chaos in [0,1] -> ribbon half-width in dB (matches the timeline's CHAOS_DISPLAY_DB)
+    const TIPS = {
+      subbass: "Sub-bass 20–80 Hz — the engine's firing fundamental and low harmonics; the highest-signal chaos band. A stop reads tonal (blue); rough/broadband road reads chaotic (yellow).",
+      low: "Low 80–250 Hz — road rumble, clear of voices. Chaos rises with broadband road texture (gravel, seams, coarse asphalt).",
+      mid: "Mid 250 Hz–1 kHz — voices, radio, wind. Chaos here is often cabin/speech noise rather than road.",
+      high: "High 1–4 kHz — cargo rattle, consonants, wind hiss; the least road-diagnostic band."
+    };
     const W = 1240, mL = 58, mR = 20, plotW = W - mL - mR, top0 = 58, hP = 176, gap = 46;
     const H = top0 + BANDS.length * (hP + gap);
     // blue (tonal) -> yellow (chaotic); t = chaos = 1 - tonality
@@ -44,8 +50,8 @@
       const x = (t) => mL + (t / maxT) * plotW;
       return { band, pts, top, dmin, dmax, maxT, x };
     });
-    const gdmin = Math.min.apply(null, meta.map((m) => m.dmin)) - 2;
-    const gdmax = Math.max.apply(null, meta.map((m) => m.dmax)) + 2;
+    const gdmin = Math.floor(Math.min.apply(null, meta.map((m) => m.dmin)) / 5) * 5; // snap axis to multiples of 5
+    const gdmax = Math.ceil(Math.max.apply(null, meta.map((m) => m.dmax)) / 5) * 5;
     meta.forEach((m) => { m.dmin = gdmin; m.dmax = gdmax; m.y = (db) => m.top + hP * (1 - (db - gdmin) / (gdmax - gdmin)); });
 
     const parts = [
@@ -77,7 +83,8 @@
         parts.push('<line x1="' + xt.toFixed(1) + '" y1="' + (top + hP) + '" x2="' + xt.toFixed(1) + '" y2="' + (top + hP - 8) + '" stroke="#dcdcdc" stroke-width="1.1" opacity="0.65"/>');
       });
       parts.push('<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + hP + '" fill="none" stroke="#888" stroke-width="1"/>');
-      parts.push('<text x="' + mL + '" y="' + (top - 8) + '" fill="#dcdcdc" font-size="12">' +
+      parts.push('<text x="' + mL + '" y="' + (top - 8) + '" fill="#dcdcdc" font-size="12" style="cursor:help">' +
+        "<title>" + esc(TIPS[band.key] || "") + "</title>" +
         esc(band.label) + " · level (dB), ribbon width = chaos, hue tonal→chaos" +
         (events.length ? " &middot; ticks = tagged events" : "") + "</text>");
     });

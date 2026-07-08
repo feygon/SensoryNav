@@ -48,6 +48,15 @@ html.dark-mode body .card td .pt { color: #7c8695; }
 .card .note { color: #666; font-size: 13px; margin: 14px 0 0; }
 html.dark-mode body .card .note { color: #9aa2ac; }
 
+/* Sticky timeline controls: while scrolling through the tall scored timeline, pin the
+   Play / Reset / Rough / Bands toolbar to the top of the viewport so it stays usable. Releases
+   once the timeline scrolls out of view. */
+#timeline-wrap .toolbar:first-of-type {
+  position: sticky; top: 0; z-index: 20;
+  background: #f6f6f6; padding: 8px 6px; margin: 0 -6px 6px; border-bottom: 1px solid #d5d5d5;
+}
+html.dark-mode body #timeline-wrap .toolbar:first-of-type { background: #161616; border-bottom-color: #333; }
+
 /* Section header introducing the on-device visualization (transition from the local-read card). */
 .viz-h { font-size: 20px; margin: 26px 0 4px; }
 .viz-sub { color: #666; font-size: 13.5px; margin: 0 0 12px; max-width: 900px; }
