@@ -11,9 +11,16 @@ function validateTag(r) {
   if (r.indicators && !Array.isArray(r.indicators)) errors.push("indicators must be array");
   return { ok: errors.length === 0, errors };
 }
-function loadRegistry(dir) {
+function loadRegistry(dirOrObj) {
+  if (dirOrObj && typeof dirOrObj === "object") return dirOrObj;
   const out = {};
-  for (const f of fs.readdirSync(dir)) if (f.endsWith(".json")) { const rec = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); out[rec.name] = rec; }
+  for (const f of fs.readdirSync(dirOrObj)) if (f.endsWith(".json")) { const rec = JSON.parse(fs.readFileSync(path.join(dirOrObj, f), "utf8")); out[rec.name] = rec; }
   return out;
 }
-module.exports = { validateTag, loadRegistry, DOMAINS, ACCEL };
+
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { validateTag, loadRegistry, DOMAINS, ACCEL };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

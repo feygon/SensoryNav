@@ -83,4 +83,18 @@ assert.strictEqual(typeof self.SensoryNavScore.windowReliability, "function", "w
 assert.strictEqual(typeof self.SensoryNavScore.validatePass, "function", "validatePass on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.validateBatch, "function", "validateBatch on self.SensoryNavScore");
 
+// SP3 tags: dual-export modules that attach to self.SensoryNavScore
+// for importScripts() use in a Worker, in addition to module.exports for Node.
+require("../harness/tags/events.js");
+require("../harness/tags/extract.js");
+require("../harness/tags/schema.js");
+assert.strictEqual(typeof self.SensoryNavScore.detectEvents, "function", "detectEvents on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.confidence, "function", "confidence on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.extractTags, "function", "extractTags on self.SensoryNavScore");
+assert.ok(self.SensoryNavScore.ACCEL_CAP && typeof self.SensoryNavScore.ACCEL_CAP === "object", "ACCEL_CAP on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.validateTag, "function", "validateTag on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.loadRegistry, "function", "loadRegistry on self.SensoryNavScore");
+assert.ok(Array.isArray(self.SensoryNavScore.DOMAINS), "DOMAINS on self.SensoryNavScore");
+assert.ok(Array.isArray(self.SensoryNavScore.ACCEL), "ACCEL on self.SensoryNavScore");
+
 console.log("browser-scope tests passed");

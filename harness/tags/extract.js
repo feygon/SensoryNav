@@ -22,4 +22,9 @@ function extractTags(event, ctx) {
   }
   return { tags, accel_gaps };
 }
-module.exports = { confidence, extractTags, ACCEL_CAP };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { confidence, extractTags, ACCEL_CAP };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}
