@@ -1,13 +1,16 @@
 /* analyze.css — Local Analysis upload page. Follows the shared theme (styles.css / theme.js):
    light-default, dark via html.dark-mode body. No pure-white surfaces in dark mode. */
 
-body { max-width: 900px; }
+/* The page is 1240px wide so the on-device timeline (built for 1240) renders at full width and
+   the 5-tier strip + Legend/Glossary sit on one line. The intro copy, drop zones, and local-read
+   card are held to a narrower, readable column so they don't stretch sparsely. */
+body { max-width: 1240px; }
 .analyze { font-size: 16px; line-height: 1.5; }
 .analyze h1 { font-size: 30px; margin: 0 0 2px; }
-.analyze .sub { color: #555; margin: 0 0 20px; font-size: 15px; }
+.analyze .sub { color: #555; margin: 0 0 20px; font-size: 15px; max-width: 860px; }
 html.dark-mode body .analyze .sub { color: #a8b0ba; }
 
-.drops { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.drops { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; max-width: 860px; }
 @media (max-width: 620px) { .drops { grid-template-columns: 1fr; } }
 
 .drop {
@@ -26,15 +29,30 @@ html.dark-mode body .drop .d { color: #9aa2ac; }
 .status { color: #b23; font-size: 14px; min-height: 1.2em; margin: 4px 0; }
 html.dark-mode body .status { color: #ff8a6a; }
 
-.card { background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 14px 18px; }
+.card { background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 16px 20px; max-width: 720px; }
 html.dark-mode body .card { background: #1b1b1b; border-color: #555; }
 .card h2 { font-size: 16px; margin: 0 0 10px; }
+/* Local-read stats: override the global bordered <table> (styles.css) — no cell borders, roomy
+   rows, a hairline separator, tabular numbers, and an emoji gutter that links a stat to the
+   viz element it feeds. */
 .card table { border-collapse: collapse; width: 100%; font-size: 14px; }
-.card th { text-align: left; color: #666; font-weight: 600; padding: 3px 12px 3px 0; white-space: nowrap; vertical-align: top; width: 130px; }
+.card th, .card td { border: none; padding: 7px 0; vertical-align: baseline; }
+.card tbody tr + tr th, .card tbody tr + tr td { border-top: 1px solid #dcdcdc; }
+html.dark-mode body .card tbody tr + tr th, html.dark-mode body .card tbody tr + tr td { border-top: 1px solid #333; }
+.card th { text-align: left; color: #666; font-weight: 600; white-space: nowrap; width: 168px; padding-right: 16px; }
 html.dark-mode body .card th { color: #9aa2ac; }
-.card td { padding: 3px 0; font-variant-numeric: tabular-nums; }
-.card .note { color: #666; font-size: 13px; margin: 12px 0 0; }
+.card td { font-variant-numeric: tabular-nums; }
+.card td .pt { color: #8a93a0; font-size: 12.5px; margin-left: 4px; }
+html.dark-mode body .card td .pt { color: #7c8695; }
+.card th .rico { display: inline-block; width: 1.4em; }
+.card .note { color: #666; font-size: 13px; margin: 14px 0 0; }
 html.dark-mode body .card .note { color: #9aa2ac; }
+
+/* Section header introducing the on-device visualization (transition from the local-read card). */
+.viz-h { font-size: 20px; margin: 26px 0 4px; }
+.viz-sub { color: #666; font-size: 13.5px; margin: 0 0 12px; max-width: 900px; }
+html.dark-mode body .viz-sub { color: #9aa2ac; }
+.ribbon-h { font-size: 20px; margin: 8px 0 2px; }
 
 .astatus { color: #2f7fd6; font-size: 14px; min-height: 1.2em; margin: 10px 0 4px; }
 html.dark-mode body .astatus { color: #7fbaff; }

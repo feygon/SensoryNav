@@ -54,32 +54,36 @@
 
   const fmtSec = (s) => (s == null ? "—" : (s >= 60 ? Math.floor(s / 60) + " min " + Math.round(s % 60) + " s" : s.toFixed(1) + " s"));
 
+  // Emoji gutter: a small icon that ties a stat to the viz element it feeds (so the local-read
+  // is a legend for what's below, not just a wall of numbers).
+  const rico = (e) => "<span class=\"rico\">" + e + "</span>";
+
   function render() {
     if (!picked.wav && !picked.json) { el.summary.hidden = true; return; }
     const rows = [];
     if (picked.wav) {
       const w = picked.wav;
-      rows.push(["WAV file", w.name]);
-      if (w.header) rows.push(["Audio", w.header.sampleRate.toLocaleString() + " Hz · " + w.header.channels + " ch · " + w.header.bits + "-bit · " + fmtSec(w.header.durationSec)]);
-      else if (w.error) rows.push(["Audio", "⚠ " + w.error]);
+      rows.push([rico("🎧") + "WAV file", w.name]);
+      if (w.header) rows.push([rico("🔊") + "Audio", w.header.sampleRate.toLocaleString() + " Hz · " + w.header.channels + " ch · " + w.header.bits + "-bit · " + fmtSec(w.header.durationSec)]);
+      else if (w.error) rows.push([rico("🔊") + "Audio", "⚠ " + w.error]);
     }
     if (picked.json) {
       const j = picked.json;
-      rows.push(["JSON sidecar", j.name]);
+      rows.push([rico("🧾") + "JSON sidecar", j.name]);
       if (j.info) {
-        rows.push(["Schema", (j.info.valid ? "✓ " : "⚠ ") + (j.info.schema || "unknown")]);
-        rows.push(["Duration", fmtSec(j.info.durationSec)]);
-        rows.push(["GPS fixes", j.info.fixCount + (j.info.speedRange ? " · " + j.info.speedRange[0].toFixed(1) + "–" + j.info.speedRange[1].toFixed(1) + " m/s" : "")]);
-      } else if (j.error) rows.push(["JSON", "⚠ " + j.error]);
+        rows.push([rico("🏷️") + "Schema", (j.info.valid ? "✓ " : "⚠ ") + (j.info.schema || "unknown")]);
+        rows.push([rico("⏱️") + "Duration", fmtSec(j.info.durationSec) + " <span class=\"pt\">→ timeline x-axis</span>"]);
+        rows.push([rico("🛰️") + "GPS fixes", j.info.fixCount + (j.info.speedRange ? " · " + j.info.speedRange[0].toFixed(1) + "–" + j.info.speedRange[1].toFixed(1) + " m/s <span class=\"pt\">→ 🔵 speed line</span>" : "")]);
+      } else if (j.error) rows.push([rico("🧾") + "JSON", "⚠ " + j.error]);
     }
     if (picked.wav && picked.wav.header && picked.json && picked.json.info) {
       const sameName = picked.json.info.wavFilename === picked.wav.name;
       const dw = picked.wav.header.durationSec, dj = picked.json.info.durationSec;
       const durClose = dw != null && dj != null && Math.abs(dw - dj) < 2;
-      rows.push(["Pair check", (sameName ? "✓ names match" : "⚠ sidecar names " + (picked.json.info.wavFilename || "?")) + " · " + (durClose ? "✓ durations align" : "⚠ durations differ")]);
+      rows.push([rico("🔗") + "Pair check", (sameName ? "✓ names match" : "⚠ sidecar names " + (picked.json.info.wavFilename || "?")) + " · " + (durClose ? "✓ durations align" : "⚠ durations differ")]);
     }
     el.summary.innerHTML = "<h2>Local read</h2>" +
-      "<table>" + rows.map((r) => "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td></tr>").join("") + "</table>" +
+      "<table><tbody>" + rows.map((r) => "<tr><th>" + r[0] + "</th><td>" + r[1] + "</td></tr>").join("") + "</tbody></table>" +
       "<p class=\"note\">Read entirely in your browser — nothing was uploaded. Drop both files to score on-device.</p>";
     el.summary.hidden = false;
   }

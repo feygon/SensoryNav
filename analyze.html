@@ -50,6 +50,8 @@
     <!-- Stacked timeline (rendered on-device by timeline-render.js, byte-identical to a scored
          research pass). Hidden until both files are dropped and the worker returns. -->
     <div id="timeline-wrap" hidden>
+      <h2 class="viz-h">Scored timeline — computed on your device</h2>
+      <p class="viz-sub">Speed, roughness, folded sub-bass, per-band levels, and tagged events over the whole pass — the same view as a scored research pass, built here from your files.</p>
       <div class="toolbar">
         <button id="play" type="button" style="display:none">&#9654; Play</button>
         <button id="reset" type="button">Reset zoom (full pass)</button>
@@ -85,7 +87,8 @@
     <!-- Secondary view: the 4-band spectral-chaos ribbon (sub-bass/low/mid/high chaos) — this is
          where low/mid/high chaos lives (the timeline folds only sub-bass). Same worker output. -->
     <section id="ribbon-wrap" hidden aria-label="Spectral-chaos ribbon">
-      <h2 class="ribbon-h">All-band spectral-chaos ribbon</h2>
+      <h2 class="ribbon-h">Per-band spectral-chaos ribbon</h2>
+      <p class="viz-sub">Chaos (spectral flatness, <span style="color:#3a6fd8">tonal</span>→<span style="color:#ebd73c">noise</span>) for each band. The timeline above folds chaos into the <b>sub-bass</b> panel only and shows low/mid/high as <i>level</i> — so the <b>low / mid / high</b> rows here are the one place per-band chaos is shown; the sub-bass row restates the timeline's folded panel.</p>
       <div id="ribbon-chart"></div>
     </section>
 
