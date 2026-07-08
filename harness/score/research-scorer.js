@@ -8,7 +8,7 @@
 // Extracted verbatim from scripts/score-research.js (Task 8) so the derivation is reusable from
 // a Worker; the script itself is now a thin I/O wrapper around scoreResearch().
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 var D = (typeof require !== "undefined") ? {
   fitBaseline: require("./baseline").fitBaseline,
   floorAt: require("./baseline").floorAt,

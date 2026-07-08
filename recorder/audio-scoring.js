@@ -1,5 +1,5 @@
 // recorder/audio-scoring.js
-const { CONSTANTS } = require("./constants");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("./constants") : self.SensoryNavCore;
 
 function bandForFrequency(freq) {
   const { low, mid, high } = CONSTANTS.BANDS;
@@ -63,6 +63,6 @@ const exported = { bandEnergiesFromSpectrum, averageWindowEnergies, bandForFrequ
 if (typeof module !== "undefined" && module.exports) {
   module.exports = exported;
 }
-if (typeof window !== "undefined") {
-  window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, exported);
+if (typeof self !== "undefined") {
+  self.SensoryNavCore = Object.assign(self.SensoryNavCore || {}, exported);
 }

@@ -1,7 +1,7 @@
 // harness/motion/kalman-smoother.js
 "use strict";
-const { matMul, transpose, matAdd, matSub, identity } = require("./linalg");
-const { solve } = require("./linalg");
+var { matMul, transpose, matAdd, matSub, identity } = (typeof require !== "undefined") ? require("./linalg") : self.SensoryNavScore;
+var { solve } = (typeof require !== "undefined") ? require("./linalg") : self.SensoryNavScore;
 
 const INIT_VEL_VAR = 50 * 50; // (50 m/s)^2
 

@@ -1,5 +1,6 @@
 "use strict";
-const fs = require("fs"), path = require("path");
+var fs = (typeof require !== "undefined") ? require("fs") : null;
+var path = (typeof require !== "undefined") ? require("path") : null;
 const DOMAINS = ["acoustics", "harmonics", "automotive-physics", "psychoacoustics", "mapping"];
 const ACCEL = ["none", "disambiguates", "required"];
 const REQUIRED = ["name", "display", "domain", "definition", "indicators", "detection", "value", "confidence", "accel_dependency", "status", "discrimination_test"];

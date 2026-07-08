@@ -1,7 +1,7 @@
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
-const { bandEnergiesFromSpectrum, averageWindowEnergies } = require("../../recorder/audio-scoring");
-const { realFftDb } = require("./fft");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
+var { bandEnergiesFromSpectrum, averageWindowEnergies } = (typeof require !== "undefined") ? require("../../recorder/audio-scoring") : self.SensoryNavCore;
+var { realFftDb } = (typeof require !== "undefined") ? require("./fft") : self.SensoryNavScore;
 
 const FFT_SIZE = CONSTANTS.FFT_SIZE;                 // 2048
 const HOP = FFT_SIZE / 2;                            // 1024

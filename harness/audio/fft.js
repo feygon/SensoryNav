@@ -1,6 +1,6 @@
 // harness/audio/fft.js
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 
 const FFT_SIZE = CONSTANTS.FFT_SIZE; // 2048
 const EPS = 1e-9;

@@ -23,6 +23,6 @@ const CONSTANTS = Object.freeze({
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { CONSTANTS };
 }
-if (typeof window !== "undefined") {
-  window.SensoryNavCore = Object.assign(window.SensoryNavCore || {}, { CONSTANTS });
+if (typeof self !== "undefined") {
+  self.SensoryNavCore = Object.assign(self.SensoryNavCore || {}, { CONSTANTS });
 }

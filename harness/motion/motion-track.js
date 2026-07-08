@@ -1,9 +1,9 @@
 // harness/motion/motion-track.js
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
-const { projectFixes, bearingDeg, R_EARTH } = require("./geo-project");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
+var { projectFixes, bearingDeg, R_EARTH } = (typeof require !== "undefined") ? require("./geo-project") : self.SensoryNavScore;
 const DEG = Math.PI / 180;
-const { smooth, evaluateAt } = require("./kalman-smoother");
+var { smooth, evaluateAt } = (typeof require !== "undefined") ? require("./kalman-smoother") : self.SensoryNavScore;
 
 const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS;
 

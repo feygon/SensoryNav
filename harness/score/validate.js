@@ -1,6 +1,6 @@
 // harness/score/validate.js
 "use strict";
-const { rocAuc, precisionRecall, bestF1Threshold, weightedSpearman } = require("./metrics");
+var { rocAuc, precisionRecall, bestF1Threshold, weightedSpearman } = (typeof require !== "undefined") ? require("./metrics") : self.SensoryNavScore;
 
 const DEFAULTS = { DETECT_TAU: 12, MIN_SPEARMAN_N: 5 };
 
