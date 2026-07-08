@@ -74,6 +74,7 @@ assert.strictEqual(typeof self.SensoryNavScore.sortDedupFixes, "function", "sort
 require("../harness/score/roughness-db.js");
 require("../harness/score/reliability.js");
 require("../harness/score/validate.js");
+require("../harness/score/speech-detect.js");
 assert.strictEqual(typeof self.SensoryNavScore.roughnessDb, "function", "roughnessDb on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.toDb, "function", "toDb on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.bandDeltaDb, "function", "bandDeltaDb on self.SensoryNavScore");
@@ -82,6 +83,7 @@ assert.ok(Array.isArray(self.SensoryNavScore.BANDS), "BANDS on self.SensoryNavSc
 assert.strictEqual(typeof self.SensoryNavScore.windowReliability, "function", "windowReliability on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.validatePass, "function", "validatePass on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.validateBatch, "function", "validateBatch on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.detectSpeech, "function", "detectSpeech on self.SensoryNavScore");
 
 // SP3 tags: dual-export modules that attach to self.SensoryNavScore
 // for importScripts() use in a Worker, in addition to module.exports for Node.
