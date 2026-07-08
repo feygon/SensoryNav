@@ -6,8 +6,11 @@
   <meta name="color-scheme" content="light dark">
   <title>SensoryNav — Local Analysis</title>
   <link rel="stylesheet" href="styles.css?v=0.2.6">
+  <link rel="stylesheet" href="pipeline.css?v=0.2.6">
   <link rel="stylesheet" href="analyze.css?v=0.2.6">
+  <link rel="stylesheet" href="timeline.css?v=0.2.6">
   <script src="theme.js?v=0.2.6"></script>
+  <script src="pipeline.js"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Site">
@@ -19,7 +22,10 @@
 
   <div class="analyze">
     <h1>Local Analysis</h1>
-    <p class="sub">Drop in a capture — a <code>.wav</code> and its <code>.json</code> sidecar — to analyze it. This runs entirely in your browser; <strong>nothing is uploaded</strong>.</p>
+    <p class="sub">Drop in a capture — a <code>.wav</code> and its <code>.json</code> sidecar — to analyze it. This runs entirely in your browser; <strong>nothing is uploaded</strong>. The audio is scored on your device and then discarded; only the derived, deidentified features remain.</p>
+
+    <!-- Shared pipeline/tier strip (pipeline.js) — same visual on every page. -->
+    <div id="pipeline-strip" data-active="analysis"></div>
 
     <div class="drops">
       <label class="drop" id="wav-drop" for="wav-input">
@@ -40,12 +46,54 @@
     <section id="summary" class="card" hidden aria-live="polite"></section>
 
     <p id="analysis-status" class="astatus" aria-live="polite"></p>
-    <section id="chart" class="chart" hidden aria-label="Spectral-chaos analysis"></section>
 
-    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The audio is decoded and scored <strong>on your device</strong> (in a background worker) into the spectral-chaos ribbon — the same view as a scored research pass. Speed, roughness, and event tags are the next layer.</p>
+    <!-- Stacked timeline (rendered on-device by timeline-render.js, byte-identical to a scored
+         research pass). Hidden until both files are dropped and the worker returns. -->
+    <div id="timeline-wrap" hidden>
+      <div class="toolbar">
+        <button id="play" type="button" style="display:none">&#9654; Play</button>
+        <button id="reset" type="button">Reset zoom (full pass)</button>
+        <button id="roughmode" type="button" style="display:none">Rough: dB</button>
+        <button id="bands" type="button" style="display:none">Bands: on</button>
+        <span id="smoothctl" style="display:none;color:#dcdcdc;">smooth <input id="smooth" type="range" min="1" max="11" step="2" value="5" style="vertical-align:middle;width:120px"> <span id="smoothval" style="color:#9fb7d4;font-variant-numeric:tabular-nums">5s</span></span>
+        <span id="range"></span>
+      </div>
+      <div class="toolbar">
+        <span class="hint">hover any panel to read exact values (level, baseline, &Delta;) in a tooltip below it; hover the small dots along a panel's bottom edge for tag detail at that moment &middot; full view: click to zoom to 30&nbsp;s &middot; zoomed: drag to pan, click to seek audio, double-click to reset &middot; Play sweeps a playhead (localhost only) and the zoomed view follows it.</span>
+      </div>
+      <div id="chartwrap"><div id="chart"></div><div id="tt"></div></div>
+      <div class="legendwrap">
+        <div class="panel gloss" aria-label="Legend">
+          <h3>Legend</h3>
+          <div class="glz" tabindex="0" data-tip="Roughness defaults to dB above the speed-conditioned floor (log, doesn't saturate); the Rough button switches to a raw linear 0–100 score. Bands are reweighted low 0.6 / mid 0.3 / high 0.1 — high is de-emphasized because it is cargo rattle, not road."><span class="sw" style="background:#4da3ff"></span><b>speed</b> (m/s) &nbsp;&middot;&nbsp; <span class="sw" style="background:#ffc04d"></span><b>roughness</b> &mdash; dB above the smooth-road floor<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The road channel is kept separate: low 80–250 Hz = road rumble (clean of voices); mid + high = voices + cargo rattle; sub-bass 20–80 Hz is folded (see the Glossary). Toggle with Bands."><span class="sw" style="background:#ebd73c"></span><span class="sw" style="background:#5fd35f"></span><span class="sw" style="background:#b98cff"></span><span class="sw" style="background:#ff7bac"></span><b>band panels</b> &mdash; sub-bass &middot; low &middot; mid &middot; high (dB)<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Baseline = this car's noise floor on smooth pavement at that instant's speed (this run's own speed-conditioned 10th-percentile floor); it rises with speed. The shaded green gap is how far the rumble sits above it — that gap, weighted low 0.6 / mid 0.3 / high 0.1, IS the roughness number."><span class="sw" style="background:#7cc47c;height:0;border-top:2px dashed #7cc47c"></span><b>baseline (dashed)</b> + green gap &mdash; delta-dB above the floor<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The sub-second structure SP1 averages into each 1 s point. A narrow spike is a <0.1 s transient; a plateau is a sustained sound. Follows the current roughness scale (dB or linear)."><span class="sw" style="background:rgba(255,192,77,0.4)"></span><b>faint amber</b> &mdash; per-frame ~47 Hz roughness<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="One per detected sub-bass event, along the bottom edge of the main and sub-bass panels. Hover a dot for that event's tags (name value·confidence), with an accelerometer-gap note where onset-sharpness couldn't be corroborated."><span class="sw" style="background:#dcdcdc;opacity:.55"></span><b>tag-event dots</b> &mdash; hover a dot for an event's tags<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Windows where mid + high co-spike (the speech signature). Roughness there is contaminated by voices, not road."><span class="sw" style="background:#ff7bac;height:8px"></span><b>pink ribbon</b> &mdash; likely talking<span class="more">&#9432;</span></div>
+        </div>
+        <div class="panel gloss" aria-label="Glossary">
+          <h3>Glossary</h3>
+          <div class="glz" tabindex="0" data-tip="The bold line is a centered moving average over the 'smooth' width; the faint line under it is the raw 1 s value. Widen the slider to collapse per-second jitter into a trend."><b>Envelope</b> &mdash; smoothed roughness trend<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Same baseline+delta grammar as the other bands, but the line is folded against structure: blue = tonal (engine, habituated) → yellow = chaotic (road, novel). Thickness redundantly encodes chaos so it stays legible without colour. Chaos = spectral flatness (1 − tonality) within 20–80 Hz."><b>folded sub-bass</b> &mdash; hue <span style="color:#3a6fd8">tonal</span>&rarr;<span style="color:#ebd73c">chaos</span>, thickness = chaos<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Auto-detected sections: stops (grey), rough / saturated stretches (red), and smooth-cruise sections (blue)."><b>shaded bands</b> &mdash; auto <span style="color:#9a9a9a">stops</span> / <span style="color:#ff785a">rough</span> / <span style="color:#4da3ff">cruise</span><span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The flat-top plateaus are the SCORE_SCALE saturation, kept as-is to calibrate against felt annotations."><b id="satpct">…</b>% of windows pinned at roughness 100<span class="more">&#9432;</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Secondary view: the 4-band spectral-chaos ribbon (sub-bass/low/mid/high chaos) — this is
+         where low/mid/high chaos lives (the timeline folds only sub-bass). Same worker output. -->
+    <section id="ribbon-wrap" hidden aria-label="Spectral-chaos ribbon">
+      <h2 class="ribbon-h">All-band spectral-chaos ribbon</h2>
+      <div id="ribbon-chart"></div>
+    </section>
+
+    <p class="foot">Both files come from the <a href="capture.html">recorder</a>. The audio is decoded and scored <strong>on your device</strong> (in a background worker) into the same stacked timeline as a scored research pass — speed, roughness, folded sub-bass, band panels, and tagged acoustic events. The audio is never saved or uploaded.</p>
   </div>
 
   <script src="ribbon-render.js"></script>
+  <script src="timeline-render.js"></script>
   <script src="analyze.js"></script>
 </body>
 </html>

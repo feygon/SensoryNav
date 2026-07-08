@@ -1,0 +1,151 @@
+{
+  "level": {
+    "name": "level",
+    "display": "Level",
+    "domain": "acoustics",
+    "definition": "Loudness above the run's own speed-conditioned smooth-road floor (delta-dB), per band.",
+    "indicators": [
+      "loudness above the speed-conditioned floor",
+      "delta-dB: 10*log10(window band energy / per-speed-conditioned floor energy)"
+    ],
+    "detection": {
+      "method": "delta-dB",
+      "band": "per-band (sub-bass/low/mid/high)",
+      "window_samples": "per-band (16384/2048/1024/512)",
+      "measure": "event median level_db minus floorAt(band, speed), normalised by LEVEL_NORM_DB=20 into [0,1]",
+      "provenance": "harness/score/baseline.js speed-conditioned floor; harness/score/roughness-db.js"
+    },
+    "value": {
+      "type": "ratio",
+      "unit": "0-1 (delta-dB / LEVEL_NORM_DB=20)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    "confidence": {
+      "model": "reliability_factor x measure_sharpness x accel_cap",
+      "basis": "delta-dB magnitude relative to the per-run noise floor; SNR of the window"
+    },
+    "accel_dependency": "none",
+    "status": "proposed",
+    "discrimination_test": {
+      "dataset": "jc-aggregate (5 passes)",
+      "claim": "typical smooth-road delta-dB vs worst rough-chop delta-dB",
+      "result": "median 2.2-2.7 dB (flat across 0-20 m/s) vs jc4 worst-chop 7-13 dB (peak 13.1 dB)"
+    },
+    "notes": "No idle-vs-driving delta-dB pair is recorded in the research (delta-dB is defined relative to each run's own per-speed floor, so an idle stop is close to 0 by construction - that is what 'stop goes quiet' means for tonality, not for level). The discrimination_test above uses the closest real figures: docs/2026-07-04-cross-pass-rough-spot-aggregation-findings.md's typical-vs-worst-chop delta-dB spread, which is the actual empirical evidence for this tag's loudness dimension."
+  },
+  "onset-sharpness": {
+    "name": "onset-sharpness",
+    "display": "Onset sharpness",
+    "domain": "acoustics",
+    "definition": "How fast an event's envelope attacks - impulsive/transient (e.g. pothole, manhole strike) versus a gradual swell (e.g. rumble strip, sustained texture).",
+    "indicators": [
+      "fast attack (impulsive) vs gradual swell",
+      "envelope attack time over a short window"
+    ],
+    "detection": {
+      "method": "envelope attack time",
+      "band": "sub-bass/low (short window)",
+      "window_samples": 2048,
+      "measure": "normalised attack slope of the event's chaos/energy rise",
+      "provenance": "docs/tags/tag-architecture.md starter set; lib/squelch.js envelope analysis"
+    },
+    "value": {
+      "type": "scalar",
+      "unit": "0-1 (normalised attack slope)",
+      "range": [
+        0,
+        1
+      ]
+    },
+    "confidence": {
+      "model": "reliability_factor x measure_sharpness x accel_cap",
+      "basis": "attack-slope sharpness; accel_cap=0.6 since an accelerometer disambiguates a true impulsive vertical impact from an audio-only sharp attack (e.g. a slammed door)"
+    },
+    "accel_dependency": "disambiguates",
+    "status": "proposed",
+    "discrimination_test": {
+      "dataset": "pending-82nd-ave",
+      "claim": "onset-sharpness separates impulsive strikes (manhole/pothole) from gradual texture swells",
+      "result": "TBD"
+    },
+    "notes": "Awaits the 82nd/39th Ave rough-road capture with labeled impulsive events; not yet reproduced on the Johnson Creek passes."
+  },
+  "sub-bass-ratio": {
+    "name": "sub-bass-ratio",
+    "display": "Sub-bass ratio",
+    "domain": "acoustics",
+    "definition": "Fraction of total spectral energy concentrated in the sub-bass band (20-80 Hz) relative to the full band stack, indicating bass-heavy road/engine content versus broadband spread.",
+    "indicators": [
+      "energy concentrated 20-80 Hz vs above",
+      "band-power ratio across sub-bass/low/mid/high"
+    ],
+    "detection": {
+      "method": "band-power ratio",
+      "band": "sub-bass 20-80 Hz / (sub-bass+low+mid+high)",
+      "window_samples": 8192,
+      "measure": "subbass band energy divided by total band-stack energy",
+      "provenance": "lib/squelch.js computeSpectralChaos; docs/tags/tag-architecture.md starter set"
+    },
+    "value": {
+      "type": "ratio",
+      "unit": "0-1",
+      "range": [
+        0,
+        1
+      ]
+    },
+    "confidence": {
+      "model": "reliability_factor x measure_sharpness x accel_cap",
+      "basis": "SNR of the sub-bass band relative to the per-run noise floor"
+    },
+    "accel_dependency": "none",
+    "status": "proposed",
+    "discrimination_test": {
+      "dataset": "pending-82nd-ave",
+      "claim": "sub-bass ratio separates bass-heavy chop (e.g. washboard/gravel) from broadband road noise",
+      "result": "TBD"
+    },
+    "notes": "Awaits the 82nd/39th Ave rough-road capture; not yet reproduced on the Johnson Creek passes."
+  },
+  "tonality": {
+    "name": "tonality",
+    "display": "Tonality",
+    "domain": "harmonics",
+    "definition": "Narrow, stable spectral peaks (a harmonic comb) versus broadband noise; the primary discriminator between idle-tonal engine content and moving-rough broadband road content in the sub-bass band.",
+    "indicators": [
+      "narrow stable spectral peaks vs broadband",
+      "harmonic-to-noise ratio (HNR)",
+      "engine firing fundamental and low harmonics live below 80 Hz"
+    ],
+    "detection": {
+      "method": "peak-prominence",
+      "band": "sub-bass 20-80 Hz (first-class; adaptive window per band)",
+      "window_samples": 16384,
+      "measure": "HNR = sum(band-bin power where power > localMedian x PEAK_K) / sum(band-bin power), clamped [0,1]; PEAK_K=3",
+      "provenance": "sub-bass discovery, 2026-07-04 stop-vs-drive test; lib/squelch.js computeSpectralChaos"
+    },
+    "value": {
+      "type": "scalar",
+      "unit": "0-1",
+      "range": [
+        0,
+        1
+      ]
+    },
+    "confidence": {
+      "model": "reliability_factor x measure_sharpness x accel_cap",
+      "basis": "peak margin (spectral peak prominence over local median); reliability capped 0 on clipping, near-floor, or speech contamination"
+    },
+    "accel_dependency": "none",
+    "status": "proposed",
+    "discrimination_test": {
+      "dataset": "jc4",
+      "claim": "idle>road",
+      "result": "0.78 vs 0.67"
+    },
+    "notes": "Adjacent 80-250 Hz 'low' band does NOT discriminate (0.72 vs 0.75, broadband either way) - this is why sub-bass is first-class. Near-silence (within BAND_SNR_MIN=6dB of the per-run noise floor) emits confidence 0 rather than a spurious high reading."
+  }
+}
