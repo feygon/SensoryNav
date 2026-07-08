@@ -35,4 +35,12 @@ for (const name of expected) {
 assert.strictEqual(typeof core.nextState, "function");
 assert.strictEqual(typeof core.encodeWav, "function");
 
+// SP1 audio front-end: dual-export modules that attach to self.SensoryNavScore
+// for importScripts() use in a Worker, in addition to module.exports for Node.
+global.self = global.self || {};
+require("../harness/audio/fft.js");
+require("../harness/audio/audio-windows.js");
+assert.strictEqual(typeof self.SensoryNavScore.stft, "function", "stft on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.framesToWindows, "function", "framesToWindows on self.SensoryNavScore");
+
 console.log("browser-scope tests passed");

@@ -88,4 +88,9 @@ function framesToWindows(samples, sampleRate, audioFirstFrameMs) {
   return windows;
 }
 
-module.exports = { framesToWindows, windowIndexFor, stft };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { framesToWindows, windowIndexFor, stft };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}
