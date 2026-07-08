@@ -105,19 +105,32 @@ analyze.html  (drop .wav + .json; strip + drop zones at top)
     │  full WAV ArrayBuffer transferred to the worker
     ▼
 analyze-worker.js   importScripts(harness deps + the extracted derivation modules)
-    ├─ decode WAV (wav-decoder)                                          → samples
+    │  SHARED FRONT-END — computed ONCE per drop, passed into both modules:
+    ├─ decode WAV (wav-decoder)                         → samples
+    ├─ SP1 framesToWindows + stft (audio-windows)       → sp1 windows, stft frames
+    └─ SP2 buildMotionTrack (Kalman)                    → sp2 track (speed)
+    │
     ├─ research-scorer module  (extracted from scripts/score-research.js)
-    │     SP1 windows + stft · SP2 Kalman track · talking detector ·
-    │     baseline (talking-excluded, OVERLAP_TIERS) · RW reweight ·
-    │     roughness_raw + roughness_db + per-band floor arrays + speech  → scored, hires
+    │     talking detector · baseline A (talking-excluded low/mid/high, OVERLAP_TIERS) ·
+    │     RW reweight · roughness_raw/db + per-band floors + speech      → scored, hires
     └─ squelch/tags module     (extracted from scripts/squelch-extract.js)
-          computeSpectralChaos · nearest-time joins · sub-bass floor ·
-          detectEvents · extractTags                                     → squelch, tags
+          computeSpectralChaos (subbass N=16384 …) · baseline B (subbass-inclusive) ·
+          nearest-time joins · sub-bass floor · detectEvents · extractTags → squelch, tags
     │  postMessage({ scored, hires, squelch, tags })
     ▼
 analyze.js → SensoryNavTimeline.drawTimeline({scored,hires,squelch,tags},
                                              { label, audioUrl }, #chart)
 ```
+
+- **Shared front-end (avoid double compute).** Today each script re-decodes and independently
+  rebuilds SP1 windows + the SP2 Kalman track. On-device, **decode + SP1 (`framesToWindows`/`stft`)
+  + SP2 (`buildMotionTrack`) run once** and are passed into both derivation modules; only the two
+  **baselines differ** and stay per-module — **A** (research scorer): talking-excluded low/mid/high
+  with `OVERLAP_TIERS`; **B** (squelch): sub-bass-inclusive via its own window build. The heavy
+  sub-bass FFT (`computeSpectralChaos`, N=16384) is inherently separate from the SP1 `stft` (different
+  window sizes) and runs once inside the squelch module. To keep the extracted scripts byte-identical
+  in Node, the shared front-end is a small helper the thin script wrappers also call (so a script run
+  still decodes+SP1+SP2 itself); only the worker reuses one front-end across both modules.
 
 - **Single pass.** The scripts already score one capture at a time (they take one sidecar); the
   baseline is fit from that pass's own talking-excluded samples with `OVERLAP_TIERS`. *Open risk:*
@@ -174,7 +187,9 @@ The four on-device products must match these shapes (the timeline renderer reads
 - **`hires`** — `{ t0, dt, r, rdb, lo, mi, hi, floLo, floMi, floHi, speech }` (the **full**
   `highres-clean.json` — with `rdb` + floor arrays; **not** the floorless `highres-trace.js`).
 - **`squelch`** — `{ params:{hopSec, bands:[{key,lo,hi,N}]}, subbass:[…], low:[…], mid:[…], high:[…],
-  subbass_floor:[…] }`, each point `{ t, level_db, tonality, chaos, peak_freqs }`.
+  subbass_floor:[…] }`, each point `{ t, energy, level_db, tonality, chaos, peak_freqs, low_conf }`
+  (per `spectral-chaos.js`; `energy` feeds the level / sub-bass-ratio tag math + baseline samples,
+  `low_conf` the near-silence guard).
 - **`tags`** — `{ events:[{ t_start, t_end, lat, lon, speed_mps, tags:{ name:{value,confidence} },
   accel_gaps:[…] }] }`; absent/empty ⇒ timeline still draws, only marks omitted (no error).
 
@@ -212,6 +227,9 @@ The four on-device products must match these shapes (the timeline renderer reads
    tolerance. Reference artifacts: `out/score-jc4/{scored,highres,squelch,tags}-clean.json`.
 4. **Ported modules keep green Node tests** — the SP1/SP2/roughness-db/tags test scripts pass
    unchanged after the dual-export tails are added.
+   - The numeric-identity bar (steps 2–3) rests on **`decodeWav` being byte-path-independent** —
+     it must yield identical samples whether fed a Node `Buffer` (`fs.readFileSync`) or the
+     transferred `ArrayBuffer`/`Uint8Array` in the worker. Assert this with a small fixture test.
 5. **Manual.** Drop `johnson-creek-pass-4` on `analyze.html`; confirm every F1–F16 behavior against
    `timeline-jc4.html` side by side (bands, dB toggle, envelope, hover values, zoom, tag dots,
    speech ribbon, localhost audio).
