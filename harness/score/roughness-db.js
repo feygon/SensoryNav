@@ -40,4 +40,9 @@ function roughnessDb(energies, floors, weights) {
   return sum;
 }
 
-module.exports = { toDb, bandDeltaDb, roughnessDb, EPS_ENERGY, BANDS };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { toDb, bandDeltaDb, roughnessDb, EPS_ENERGY, BANDS };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

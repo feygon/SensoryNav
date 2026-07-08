@@ -69,4 +69,18 @@ assert.strictEqual(typeof self.SensoryNavScore.classifyWindow, "function", "clas
 assert.strictEqual(typeof self.SensoryNavScore.confidenceFromCov, "function", "confidenceFromCov on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.sortDedupFixes, "function", "sortDedupFixes on self.SensoryNavScore");
 
+// SP3 score modules: dual-export modules that attach to self.SensoryNavScore
+// for importScripts() use in a Worker, in addition to module.exports for Node.
+require("../harness/score/roughness-db.js");
+require("../harness/score/reliability.js");
+require("../harness/score/validate.js");
+assert.strictEqual(typeof self.SensoryNavScore.roughnessDb, "function", "roughnessDb on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.toDb, "function", "toDb on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.bandDeltaDb, "function", "bandDeltaDb on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.EPS_ENERGY, "number", "EPS_ENERGY on self.SensoryNavScore");
+assert.ok(Array.isArray(self.SensoryNavScore.BANDS), "BANDS on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.windowReliability, "function", "windowReliability on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.validatePass, "function", "validatePass on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.validateBatch, "function", "validateBatch on self.SensoryNavScore");
+
 console.log("browser-scope tests passed");

@@ -59,4 +59,9 @@ function validateBatch(perPassScored, params) {
   return { per_pass: perPassScored.map((s) => buildSummary(s, p)), aggregate: buildSummary(pooled, p) };
 }
 
-module.exports = { validatePass, validateBatch };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { validatePass, validateBatch };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

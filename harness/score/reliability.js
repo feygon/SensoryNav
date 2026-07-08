@@ -22,4 +22,9 @@ function windowReliability(sp1win, sp2rec, params) {
   return { reliability, flags };
 }
 
-module.exports = { windowReliability };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { windowReliability };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}
