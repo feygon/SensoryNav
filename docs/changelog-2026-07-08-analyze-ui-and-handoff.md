@@ -22,14 +22,14 @@ Each item is a self-contained change; checked off as landed.
   the Play / Reset-zoom / Rough dB / Bands toolbar to the top of the viewport (`position: sticky`),
   with a readable background, so the controls stay usable while looking at lower panels.
 
-- [ ] **5. Capture: "Analyze upon stopping" checkbox (default CHECKED).** On Stop, instead of
+- [x] **5. Capture: "Analyze upon stopping" checkbox (default CHECKED).** On Stop, instead of
   downloading, hand the just-recorded WAV + sidecar to the analyze page (IndexedDB one-shot stash),
   navigate there, load them into the drop slots, and analyze automatically.
 
-- [ ] **6. Capture: "Also download files" checkbox (default UNCHECKED).** When checked, also download
+- [x] **6. Capture: "Also download files" checkbox (default UNCHECKED).** When checked, also download
   the files on Stop (in addition to whatever "Analyze upon stopping" does).
 
-- [ ] **7. Capture: unchecked "Analyze upon stopping" ⇒ always download.** When "Analyze upon
+- [x] **7. Capture: unchecked "Analyze upon stopping" ⇒ always download.** When "Analyze upon
   stopping" is off, Stop downloads the files as today (regardless of checkbox 6).
 
 ## Notes

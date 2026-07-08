@@ -40,6 +40,12 @@ html.dark-mode body .controls button { background: #2a2a2a; color: #eee; border-
 .warning { color: #b23; font-weight: 600; }
 html.dark-mode body .warning { color: #ff8a6a; }
 
+/* on-stop options — analyze-vs-download checkboxes */
+.stop-opts { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 12px 0 2px; }
+.stop-opt { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: #333; cursor: pointer; font-weight: 500; }
+html.dark-mode body .stop-opt { color: #cdd3db; }
+.stop-opt input { width: 16px; height: 16px; }
+
 /* optional privacy trims — checkboxes with a hover/focus tooltip */
 .trim-opts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 4px 0 2px; }
 .trim-opt { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: #555; cursor: pointer; }

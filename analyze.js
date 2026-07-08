@@ -204,4 +204,17 @@
     zone.addEventListener("dragleave", () => zone.classList.remove("over"));
     zone.addEventListener("drop", (e) => { e.preventDefault(); zone.classList.remove("over"); for (const f of e.dataTransfer.files) accept(f); });
   });
+
+  // If we arrived from the capture page's "Analyze upon stopping", the WAV + sidecar were stashed in
+  // IndexedDB — take them (one-shot) and feed them straight into the same intake as a manual drop.
+  if (window.SensoryNavHandoff && window.SensoryNavHandoff.takeHandoff) {
+    window.SensoryNavHandoff.takeHandoff().then((rec) => {
+      if (!rec || !rec.wavBlob || !rec.manifest) return;
+      el.status.textContent = "Loaded your recording from the recorder — analyzing on your device…";
+      const wavFile = new File([rec.wavBlob], rec.wavName || "capture.wav", { type: "audio/wav" });
+      const jsonFile = new File([JSON.stringify(rec.manifest)], rec.jsonName || "capture.json", { type: "application/json" });
+      accept(jsonFile);
+      accept(wavFile);
+    });
+  }
 }());

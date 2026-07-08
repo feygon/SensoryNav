@@ -42,6 +42,11 @@
           <button id="stop" type="button" disabled>Stop recording</button>
         </div>
 
+        <div class="stop-opts" aria-label="On stop">
+          <label class="stop-opt"><input type="checkbox" id="analyze-on-stop" checked> Analyze upon stopping</label>
+          <label class="stop-opt"><input type="checkbox" id="also-download"> Also download files</label>
+        </div>
+
         <div class="trim-opts" aria-label="Optional privacy trims">
           <label class="trim-opt" data-tip="Optional, for deidentifying GPS. If checked, the first 30 s of audio and GPS fixes are removed at download — the start of your trip (often near home) is never written to a file.">
             <input type="checkbox" id="trim-start"> Remove first 30&nbsp;s <span class="tipmark" aria-hidden="true">&#9432;</span>
@@ -83,6 +88,7 @@
   <script src="recorder/capture-state.js"></script>
   <script src="recorder/capture-manifest.js"></script>
   <script src="recorder/trim-capture.js"></script>
+  <script src="recorder/capture-handoff.js"></script>
   <script src="capture.js"></script>
 </body>
 </html>
