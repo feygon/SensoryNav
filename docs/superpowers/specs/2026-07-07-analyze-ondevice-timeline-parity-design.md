@@ -76,8 +76,11 @@ this table** — if a row is wrong, the spec is wrong.
 the generator and the page. The scored/hires/squelch/tags values are produced by the **same
 derivation code** that writes today's `*-clean.json`, extracted from `score-research.js` /
 `squelch-extract.js` into modules the worker and the scripts both call. No numbers are recomputed by
-a second, divergent path — that mistake (using `run-scorer.js`'s product weights instead of the
-research reweight) would silently break F1/F2/F4/F5.
+a second, divergent path. The timeline's producer is `score-research.js` (not `run-scorer.js`)
+because of its **talking-exclusion baseline, `OVERLAP_TIERS`, and `roughness_db`** — reusing
+`run-scorer.js` would silently break F1/F2/F4/F5 on those axes. (Band **weights** are no longer a
+divergence risk: the former product weighting was removed; `CONSTANTS.WEIGHTS = low 0.6 / mid 0.3 /
+high 0.1` is now the single canonical set used by the app, SP3, and the timeline alike.)
 
 **Band chaos treatment (matches `sample/timeline-jc4.html`).** Chaos is **folded into the sub-bass
 panel only** (F3): hue + thickness carry chaos *with* level. Low / mid+high (F4, F5) show **level
@@ -254,8 +257,9 @@ The four on-device products must match these shapes (the timeline renderer reads
 
 - **Roughness (dB)** — how far the road rumble sits above this car's smooth-pavement floor at the
   current speed; default, log-scaled, non-saturating. **Linear** = the raw 0–100 score.
-- **Research reweight (RW)** — the timeline's band weighting `low 0.6 / mid 0.3 / high 0.1` (a tool
-  override, *not* the product `CONSTANTS.WEIGHTS`); high is de-emphasized as cargo rattle + speech.
+- **Band weights** — `CONSTANTS.WEIGHTS = low 0.6 / mid 0.3 / high 0.1`, the single canonical set
+  (the old product weighting `0.45/0.4/0.15` was removed); high is de-emphasized as cargo rattle +
+  speech consonants, not road. Sub-bass is not weighted here — it is a first-class separate channel.
 - **Talking exclusion** — windows where mid+high co-spike (speech) are dropped from the baseline fit
   and marked; also drives the pink speech ribbon (F10).
 - **Baseline / floor** — the run's own speed-conditioned 10th-percentile noise floor (rises with
@@ -272,7 +276,7 @@ The four on-device products must match these shapes (the timeline renderer reads
 **Reused / extended code**
 - `scripts/plot-timeline.js` — the renderer to extract (F1–F16 live here today).
 - `scripts/score-research.js` — **true producer** of `scored-clean.json` + `highres-clean.json`
-  (RW reweight, talking exclusion, `OVERLAP_TIERS`, `roughness_db`, floors, speech).
+  (canonical `CONSTANTS.WEIGHTS`, talking exclusion, `OVERLAP_TIERS`, `roughness_db`, floors, speech).
 - `scripts/squelch-extract.js` — **true producer** of `squelch-clean.json` + `tags-clean.json`.
 - `ribbon-render.js` (`SensoryNavRibbon.drawRibbon`) — the extraction pattern to mirror.
 - `scripts/lib/timeline.css`; `pipeline.js` / `pipeline.css` — reused assets.

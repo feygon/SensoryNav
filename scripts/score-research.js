@@ -20,9 +20,10 @@ const { roughnessDb, toDb } = require("../harness/score/roughness-db");
 const { CONSTANTS } = require("../recorder/constants");
 
 const SCORE_SCALE = CONSTANTS.SCORE_SCALE, DETECT_TAU = 12;
-// Research reweight (tool override, NOT product CONSTANTS.WEIGHTS): sums to 1 for
-// comparability. high (1-4 kHz) is a small situational slice (cargo rattle + speech).
-const RW = { low: 0.6, mid: 0.3, high: 0.1 };
+// Band weighting = the single canonical CONSTANTS.WEIGHTS (low 0.6 / mid 0.3 / high 0.1).
+// There is no separate "research" reweight any more — the product weights were removed so this
+// scorer, the SP3 scorer, and the app can never diverge.
+const RW = CONSTANTS.WEIGHTS;
 const BANDS = ["low", "mid", "high"];
 // Talking signature (tuned on the seat run): mid+high co-elevated for >= SPEECH_FRAMES frames/sec.
 const HI = -40, MID = -35, SPEECH_FRAMES = 3;

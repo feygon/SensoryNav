@@ -391,7 +391,7 @@ git commit -m "feat(score): extract talking/speech detector (feeds baseline excl
 
 **Interfaces:**
 - Consumes: `buildFrontEnd` (Task 6), `detectSpeech` (Task 7), `fitBaseline`/`floorAt`/`globalFloorAt`/`baselineMeta` (baseline), `windowReliability`, `roughnessDb`/`toDb`, `validateBatch`, `CONSTANTS`.
-- Produces: `scoreResearch(front, opts) → { scored, hires }`, where `scored` and `hires` are the exact objects `score-research.js` writes to `scored-clean.json` and `highres-clean.json` today (§5 shapes). `opts` carries `{ RW, OVERLAP_TIERS, SCORE_SCALE, DETECT_TAU }` with the current defaults.
+- Produces: `scoreResearch(front, opts) → { scored, hires }`, where `scored` and `hires` are the exact objects `score-research.js` writes to `scored-clean.json` and `highres-clean.json` today (§5 shapes). Band weights come from the canonical `CONSTANTS.WEIGHTS` (low 0.6 / mid 0.3 / high 0.1 — the product weights were removed; do NOT reintroduce a local reweight); `opts` carries `{ OVERLAP_TIERS, SCORE_SCALE, DETECT_TAU }` with the current defaults.
 
 - [ ] **Step 1: Snapshot the reference outputs** (if not already committed).
   Run: `node scripts/score-research.js data/johnson-creek-pass-4-181806.json out/score-jc4`
@@ -423,7 +423,7 @@ console.log("research-scorer.test.js OK");
 - [ ] **Step 3: Run to verify it fails.**
   Run: `node tests/research-scorer.test.js` → FAIL (module missing).
 
-- [ ] **Step 4: Implement `research-scorer.js`** by moving the derivation from `score-research.js` verbatim: the `RW` reweight, talking-excluded baseline-sample build (`reliability = 0` when `speech.isTalking(i)`), `fitBaseline(samples, { OVERLAP_TIERS: [[10,0.25],[5,0.50]] })`, `roughLinear`/`roughDbCalc`, the `scored` map, and the hires frame loop producing `{ t0,dt,r,rdb,lo,mi,hi,floLo,floMi,floHi,speech }`. Take `front` (from `buildFrontEnd`) + `front.speech` as inputs instead of recomputing them. No `fs`/`argv`. Dual-export tail. Decompose into named helpers (`baselineSamples`, `scoreWindow`, `hiresTrace`) to respect the ≤100-line rule.
+- [ ] **Step 4: Implement `research-scorer.js`** by moving the derivation from `score-research.js` verbatim: band weighting via `CONSTANTS.WEIGHTS` (the `RW` alias — do not reintroduce a local weight literal), talking-excluded baseline-sample build (`reliability = 0` when `speech.isTalking(i)`), `fitBaseline(samples, { OVERLAP_TIERS: [[10,0.25],[5,0.50]] })`, `roughLinear`/`roughDbCalc`, the `scored` map, and the hires frame loop producing `{ t0,dt,r,rdb,lo,mi,hi,floLo,floMi,floHi,speech }`. Take `front` (from `buildFrontEnd`) + `front.speech` as inputs instead of recomputing them. No `fs`/`argv`. Dual-export tail. Decompose into named helpers (`baselineSamples`, `scoreWindow`, `hiresTrace`) to respect the ≤100-line rule.
 
 - [ ] **Step 5: Run to verify it passes.**
   Run: `node tests/research-scorer.test.js` → PASS.
