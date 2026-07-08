@@ -113,4 +113,9 @@ function evaluateAt(smoothed, t, sigmaA) {
   return { s: colToVec(sProp), P: PProp };
 }
 
-module.exports = { smooth, evaluateAt, forwardFilter, rtsBackward, INIT_VEL_VAR };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { smooth, evaluateAt, forwardFilter, rtsBackward, INIT_VEL_VAR };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

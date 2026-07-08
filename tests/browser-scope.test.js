@@ -43,4 +43,30 @@ require("../harness/audio/audio-windows.js");
 assert.strictEqual(typeof self.SensoryNavScore.stft, "function", "stft on self.SensoryNavScore");
 assert.strictEqual(typeof self.SensoryNavScore.framesToWindows, "function", "framesToWindows on self.SensoryNavScore");
 
+// SP2 motion track: dual-export modules that attach to self.SensoryNavScore
+// for importScripts() use in a Worker, in addition to module.exports for Node.
+require("../harness/motion/linalg.js");
+require("../harness/motion/geo-project.js");
+require("../harness/motion/kalman-smoother.js");
+require("../harness/motion/motion-track.js");
+assert.strictEqual(typeof self.SensoryNavScore.matMul, "function", "matMul on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.transpose, "function", "transpose on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.identity, "function", "identity on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.matAdd, "function", "matAdd on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.matSub, "function", "matSub on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.scale, "function", "scale on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.solve, "function", "solve on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.projectFixes, "function", "projectFixes on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.bearingDeg, "function", "bearingDeg on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.R_EARTH, "number", "R_EARTH on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.smooth, "function", "smooth on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.evaluateAt, "function", "evaluateAt on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.forwardFilter, "function", "forwardFilter on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.rtsBackward, "function", "rtsBackward on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.INIT_VEL_VAR, "number", "INIT_VEL_VAR on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.buildMotionTrack, "function", "buildMotionTrack on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.classifyWindow, "function", "classifyWindow on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.confidenceFromCov, "function", "confidenceFromCov on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.sortDedupFixes, "function", "sortDedupFixes on self.SensoryNavScore");
+
 console.log("browser-scope tests passed");

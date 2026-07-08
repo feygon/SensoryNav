@@ -119,4 +119,9 @@ function buildMotionTrack(gpsSamples, windows, params) {
   return windows.map((w) => windowMotion(w, smoothed, points, p, lat0, lon0));
 }
 
-module.exports = { buildMotionTrack, classifyWindow, confidenceFromCov, sortDedupFixes };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { buildMotionTrack, classifyWindow, confidenceFromCov, sortDedupFixes };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

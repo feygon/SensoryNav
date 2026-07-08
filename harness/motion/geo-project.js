@@ -25,4 +25,9 @@ function bearingDeg(vEast, vNorth) {
   return ((Math.atan2(vEast, vNorth) * 180 / Math.PI) + 360) % 360;
 }
 
-module.exports = { projectFixes, bearingDeg, R_EARTH };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { projectFixes, bearingDeg, R_EARTH };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

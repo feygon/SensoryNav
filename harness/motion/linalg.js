@@ -72,4 +72,9 @@ function solve(A, B) {
   return X;
 }
 
-module.exports = { matMul, transpose, identity, matAdd, matSub, scale, solve };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { matMul, transpose, identity, matAdd, matSub, scale, solve };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}
