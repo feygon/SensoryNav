@@ -23,7 +23,7 @@
       { key: "high", label: "high 1000–4000 Hz", line: "#ff7bac" }
     ].filter((b) => sq[b.key] && sq[b.key].length);
     const CHAOS_DB = 8; // chaos in [0,1] -> ribbon half-width in dB (matches the timeline's CHAOS_DISPLAY_DB)
-    const W = 1240, mL = 58, mR = 20, plotW = W - mL - mR, top0 = 40, hP = 176, gap = 46;
+    const W = 1240, mL = 58, mR = 20, plotW = W - mL - mR, top0 = 58, hP = 176, gap = 46;
     const H = top0 + BANDS.length * (hP + gap);
     // blue (tonal) -> yellow (chaotic); t = chaos = 1 - tonality
     function hue(tonality) {
@@ -32,18 +32,21 @@
       return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",") + ")";
     }
 
-    // Per-band geometry, kept so hover can map cursor -> nearest point in that panel.
+    // Per-band geometry. ALL bands share ONE dB axis (same dmin/dmax, same height) so their spectral
+    // lines are directly comparable — identical data reads as identical, and real differences between
+    // bands stay visible instead of being hidden by per-band auto-scaling.
     const meta = BANDS.map((band, bi) => {
       const pts = sq[band.key];
       const top = top0 + bi * (hP + gap);
       let dmin = Infinity, dmax = -Infinity;
       pts.forEach((p) => { const hw = (p.chaos || 0) * CHAOS_DB; dmin = Math.min(dmin, p.level_db - hw); dmax = Math.max(dmax, p.level_db + hw); });
-      dmin -= 2; dmax += 2;
       const maxT = pts[pts.length - 1].t || 1;
       const x = (t) => mL + (t / maxT) * plotW;
-      const y = (db) => top + hP * (1 - (db - dmin) / (dmax - dmin));
-      return { band, pts, top, dmin, dmax, maxT, x, y };
+      return { band, pts, top, dmin, dmax, maxT, x };
     });
+    const gdmin = Math.min.apply(null, meta.map((m) => m.dmin)) - 2;
+    const gdmax = Math.max.apply(null, meta.map((m) => m.dmax)) + 2;
+    meta.forEach((m) => { m.dmin = gdmin; m.dmax = gdmax; m.y = (db) => m.top + hP * (1 - (db - gdmin) / (gdmax - gdmin)); });
 
     const parts = [
       '<rect width="' + W + '" height="' + H + '" fill="#1a1a1a"/>',

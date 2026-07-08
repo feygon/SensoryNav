@@ -251,6 +251,9 @@ The four on-device products must match these shapes (the timeline renderer reads
   chaos *may* begin to discriminate. When the incoming highway + cargo captures confirm it, **fold the
   low panel like sub-bass** (level + chaos in one line) — not the either/or toggle. Until then, low
   stays level-only to match the sample.
+- **Sticky timeline controls (UI follow-up).** When the page is scrolled past the scored timeline,
+  freeze the timeline's Play / Reset-zoom / Rough dB / Bands controls to the top of the viewport (a
+  sticky toolbar) so they stay usable while looking at the panels/ribbon below.
 - Cross-pass aggregation, roughmap, and the map tier remain later pipeline stages.
 
 ## 10. Glossary

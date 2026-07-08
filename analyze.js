@@ -178,16 +178,13 @@
     );
   }
 
-  // Per-band chaos ribbon via the SHARED ribbon renderer — LOW/MID/HIGH only. Sub-bass chaos is
-  // already the timeline's folded panel, so it is omitted here (showing the same data twice, drawn
-  // differently, is exactly the inconsistency to avoid). Tags are passed so the ribbon marks the
-  // same tag-events the timeline does.
+  // Per-band chaos ribbon via the SHARED ribbon renderer — ALL FOUR bands (sub-bass is the
+  // highest-signal chaos section, so it stays). All bands share one dB axis so the spectral lines
+  // are directly comparable. Tags are passed so the ribbon marks the same tag-events the timeline does.
   function showRibbon() {
     if (!lastResult || !window.SensoryNavRibbon || !el.ribbonChart) return;
     const label = (picked.wav && picked.wav.name) || "capture";
-    const bandsOnly = Object.assign({}, lastResult.squelch);
-    delete bandsOnly.subbass; delete bandsOnly.subbass_floor; // drop the row the timeline already folds
-    window.SensoryNavRibbon.drawRibbon({ squelch: bandsOnly, tags: lastResult.tags }, { label: label }, el.ribbonChart);
+    window.SensoryNavRibbon.drawRibbon({ squelch: lastResult.squelch, tags: lastResult.tags }, { label: label }, el.ribbonChart);
     el.ribbonWrap.hidden = false;
   }
 

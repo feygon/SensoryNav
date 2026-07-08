@@ -90,13 +90,13 @@
       <div id="chartwrap"><div id="chart"></div><div id="tt"></div></div>
     </div>
 
-    <!-- Secondary view: per-band spectral-chaos ribbon. Shows low/mid/high CHAOS (tonal→noise),
-         which the timeline does not — the timeline folds chaos into sub-bass only and draws
-         low/mid/high as level. Sub-bass is omitted here to avoid restating the folded panel. Same
-         worker output; the tag-event dots match the timeline's. -->
+    <!-- Per-band spectral-chaos ribbon — all four bands on ONE shared dB axis (directly comparable).
+         Sub-bass is the highest-signal chaos section. The timeline folds chaos into its sub-bass
+         panel and draws low/mid/high as level; this ribbon is where per-band chaos is shown. Same
+         worker output; the tag-event ticks match the timeline's. -->
     <section id="ribbon-wrap" hidden aria-label="Spectral-chaos ribbon">
       <h2 class="ribbon-h">Per-band spectral-chaos ribbon</h2>
-      <p class="viz-sub">Chaos (spectral flatness, <span style="color:#3a6fd8">tonal</span>→<span style="color:#ebd73c">noise</span>) for <b>low / mid / high</b> — the one place per-band chaos is shown, since the timeline draws these bands as <i>level</i> and folds chaos into sub-bass only. Dots mark the same tagged events as the timeline.</p>
+      <p class="viz-sub">Chaos (spectral flatness, <span style="color:#3a6fd8">tonal</span>→<span style="color:#ebd73c">noise</span>) for <b>sub-bass · low · mid · high</b>, all on one shared dB scale so the bands are directly comparable. Sub-bass carries the strongest chaos signal; low/mid/high chaos appears only here. Ticks mark the same tagged events as the timeline — hover near one for its tags.</p>
       <div id="ribbon-chart"></div>
     </section>
 

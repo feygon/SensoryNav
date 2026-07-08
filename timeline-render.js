@@ -316,16 +316,17 @@ function chartClient(D) {
       + bandFloorLine(hr.floLo, C_LOF, yDbLow) + bandFloorLine(hr.floMi, C_MIF, yDbMH) + bandFloorLine(hr.floHi, C_HIF, yDbMH)
       + bandLine(hr.lo, C_LO, yDbLow) + bandLine(hr.mi, C_MI, yDbMH) + bandLine(hr.hi, C_HI, yDbMH);
   }
-  // Tag-event marks: small dots along the bottom edge of a panel, one per tags-clean.json event.
-  // Hover them (the bottom strip, see showHover) for a tooltip listing that event's tags.
+  // Tag-event marks: short TICKS rising from the bottom edge of a panel, one per tags-clean.json
+  // event. Hover the bottom strip (see showHover) for a tooltip listing that event's tags.
   function eventMidT(ev) { return (ev.t_start + ev.t_end) / 2; }
   function eventMarks(top, bottom) {
     if (!events.length) return "";
-    var y = bottom - 5, out = "";
+    var out = "";
     for (var i = 0; i < events.length; i++) {
       var tm = eventMidT(events[i]);
       if (tm < view[0] - 1 || tm > view[1] + 1) continue;
-      out += '<circle cx="' + xf(tm).toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="#dcdcdc" opacity="0.55"/>';
+      var px = xf(tm).toFixed(1);
+      out += '<line x1="' + px + '" y1="' + bottom + '" x2="' + px + '" y2="' + (bottom - 8) + '" stroke="#dcdcdc" stroke-width="1.1" opacity="0.6"/>';
     }
     return out;
   }
