@@ -3,13 +3,16 @@
 // subbass/low/mid/high from a squelch-clean.json shape: centre line = band level (dB), ribbon
 // half-width = chaos, hue blue=tonal -> yellow=chaotic (thickness carries chaos too, CVD-safe).
 //
-// drawRibbon(sources, cfg, mount): sources = { squelch: <squelch-clean.json> }, cfg = { label },
-// mount = the element to render the SVG into.
+// drawRibbon(sources, cfg, mount): sources = { squelch: <squelch-clean.json>, tags?: <tags-clean.json> },
+// cfg = { label }, mount = the element to render the SVG into. When sources.tags is given, its events
+// are marked as dots along the bottom edge of each band row (same events the timeline marks); absent
+// tags => no dots (so the standalone ribbon pages stay byte-identical).
 (function () {
   "use strict";
   function drawRibbon(sources, cfg, mount) {
     const sq = sources.squelch;
     if (!sq) { mount.textContent = "no squelch data"; return; }
+    const events = (sources.tags && sources.tags.events) || [];
     const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
     const BANDS = [
       { key: "subbass", label: "sub-bass 20–80 Hz", line: "#ebd73c" },
@@ -54,6 +57,12 @@
         line += x(p.t).toFixed(1) + "," + y(p.level_db).toFixed(1) + " ";
       });
       parts.push('<polyline fill="none" stroke="' + band.line + '" stroke-width="1.3" points="' + line.trim() + '"/>');
+      // tag-event dots along the bottom edge (same events the timeline marks), when tags are given
+      events.forEach((ev) => {
+        const tm = (ev.t_start + ev.t_end) / 2;
+        if (tm < 0 || tm > maxT) return;
+        parts.push('<circle cx="' + x(tm).toFixed(1) + '" cy="' + (top + hP - 5).toFixed(1) + '" r="2.6" fill="#dcdcdc" opacity="0.55"/>');
+      });
       parts.push('<rect x="' + mL + '" y="' + top + '" width="' + plotW + '" height="' + hP + '" fill="none" stroke="#888" stroke-width="1"/>');
       parts.push('<text x="' + mL + '" y="' + (top - 8) + '" fill="#dcdcdc" font-size="12">' +
         esc(band.label) + " · level (dB), ribbon width = chaos, hue tonal→chaos</text>");

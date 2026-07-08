@@ -47,6 +47,30 @@
 
     <p id="analysis-status" class="astatus" aria-live="polite"></p>
 
+    <!-- Legend + Glossary — the key for BOTH visualizations below. Placed right after the stats so
+         you read it before the data. Hidden until the analysis runs. -->
+    <div id="legend-wrap" hidden>
+      <h2 class="viz-h">Reading the charts</h2>
+      <div class="legendwrap">
+        <div class="panel gloss" aria-label="Legend">
+          <h3>Legend</h3>
+          <div class="glz" tabindex="0" data-tip="Roughness defaults to dB above the speed-conditioned floor (log, doesn't saturate); the Rough button switches to a raw linear 0–100 score. Bands are reweighted low 0.6 / mid 0.3 / high 0.1 — high is de-emphasized because it is cargo rattle, not road."><span class="sw" style="background:#4da3ff"></span><b>speed</b> (m/s) &nbsp;&middot;&nbsp; <span class="sw" style="background:#ffc04d"></span><b>roughness</b> &mdash; dB above the smooth-road floor<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The road channel is kept separate: low 80–250 Hz = road rumble (clean of voices); mid + high = voices + cargo rattle; sub-bass 20–80 Hz is folded (see the Glossary). Toggle with Bands."><span class="sw" style="background:#ebd73c"></span><span class="sw" style="background:#5fd35f"></span><span class="sw" style="background:#b98cff"></span><span class="sw" style="background:#ff7bac"></span><b>band panels</b> &mdash; sub-bass &middot; low &middot; mid &middot; high (dB)<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Baseline = this car's noise floor on smooth pavement at that instant's speed (this run's own speed-conditioned 10th-percentile floor); it rises with speed. The shaded green gap is how far the rumble sits above it — that gap, weighted low 0.6 / mid 0.3 / high 0.1, IS the roughness number."><span class="sw" style="background:#7cc47c;height:0;border-top:2px dashed #7cc47c"></span><b>baseline (dashed)</b> + green gap &mdash; delta-dB above the floor<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The sub-second structure SP1 averages into each 1 s point. A narrow spike is a <0.1 s transient; a plateau is a sustained sound. Follows the current roughness scale (dB or linear)."><span class="sw" style="background:rgba(255,192,77,0.4)"></span><b>faint amber</b> &mdash; per-frame ~47 Hz roughness<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="One per detected sub-bass event, along the bottom edge of the main and sub-bass panels (and the per-band ribbon below). Hover a dot for that event's tags (name value·confidence), with an accelerometer-gap note where onset-sharpness couldn't be corroborated."><span class="sw" style="background:#dcdcdc;opacity:.55"></span><b>tag-event dots</b> &mdash; hover a dot for an event's tags<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Windows where mid + high co-spike (the speech signature). Roughness there is contaminated by voices, not road."><span class="sw" style="background:#ff7bac;height:8px"></span><b>pink ribbon</b> &mdash; likely talking<span class="more">&#9432;</span></div>
+        </div>
+        <div class="panel gloss" aria-label="Glossary">
+          <h3>Glossary</h3>
+          <div class="glz" tabindex="0" data-tip="The bold line is a centered moving average over the 'smooth' width; the faint line under it is the raw 1 s value. Widen the slider to collapse per-second jitter into a trend."><b>Envelope</b> &mdash; smoothed roughness trend<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Same baseline+delta grammar as the other bands, but the line is folded against structure: blue = tonal (engine, habituated) → yellow = chaotic (road, novel). Thickness redundantly encodes chaos so it stays legible without colour. Chaos = spectral flatness (1 − tonality) within 20–80 Hz."><b>folded sub-bass</b> &mdash; hue <span style="color:#3a6fd8">tonal</span>&rarr;<span style="color:#ebd73c">chaos</span>, thickness = chaos<span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="Auto-detected sections: stops (grey), rough / saturated stretches (red), and smooth-cruise sections (blue)."><b>shaded bands</b> &mdash; auto <span style="color:#9a9a9a">stops</span> / <span style="color:#ff785a">rough</span> / <span style="color:#4da3ff">cruise</span><span class="more">&#9432;</span></div>
+          <div class="glz" tabindex="0" data-tip="The flat-top plateaus are the SCORE_SCALE saturation, kept as-is to calibrate against felt annotations."><b id="satpct">…</b>% of windows pinned at roughness 100<span class="more">&#9432;</span></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Stacked timeline (rendered on-device by timeline-render.js, byte-identical to a scored
          research pass). Hidden until both files are dropped and the worker returns. -->
     <div id="timeline-wrap" hidden>
@@ -64,31 +88,15 @@
         <span class="hint">hover any panel to read exact values (level, baseline, &Delta;) in a tooltip below it; hover the small dots along a panel's bottom edge for tag detail at that moment &middot; full view: click to zoom to 30&nbsp;s &middot; zoomed: drag to pan, click to seek audio, double-click to reset &middot; Play sweeps a playhead (localhost only) and the zoomed view follows it.</span>
       </div>
       <div id="chartwrap"><div id="chart"></div><div id="tt"></div></div>
-      <div class="legendwrap">
-        <div class="panel gloss" aria-label="Legend">
-          <h3>Legend</h3>
-          <div class="glz" tabindex="0" data-tip="Roughness defaults to dB above the speed-conditioned floor (log, doesn't saturate); the Rough button switches to a raw linear 0–100 score. Bands are reweighted low 0.6 / mid 0.3 / high 0.1 — high is de-emphasized because it is cargo rattle, not road."><span class="sw" style="background:#4da3ff"></span><b>speed</b> (m/s) &nbsp;&middot;&nbsp; <span class="sw" style="background:#ffc04d"></span><b>roughness</b> &mdash; dB above the smooth-road floor<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="The road channel is kept separate: low 80–250 Hz = road rumble (clean of voices); mid + high = voices + cargo rattle; sub-bass 20–80 Hz is folded (see the Glossary). Toggle with Bands."><span class="sw" style="background:#ebd73c"></span><span class="sw" style="background:#5fd35f"></span><span class="sw" style="background:#b98cff"></span><span class="sw" style="background:#ff7bac"></span><b>band panels</b> &mdash; sub-bass &middot; low &middot; mid &middot; high (dB)<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="Baseline = this car's noise floor on smooth pavement at that instant's speed (this run's own speed-conditioned 10th-percentile floor); it rises with speed. The shaded green gap is how far the rumble sits above it — that gap, weighted low 0.6 / mid 0.3 / high 0.1, IS the roughness number."><span class="sw" style="background:#7cc47c;height:0;border-top:2px dashed #7cc47c"></span><b>baseline (dashed)</b> + green gap &mdash; delta-dB above the floor<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="The sub-second structure SP1 averages into each 1 s point. A narrow spike is a <0.1 s transient; a plateau is a sustained sound. Follows the current roughness scale (dB or linear)."><span class="sw" style="background:rgba(255,192,77,0.4)"></span><b>faint amber</b> &mdash; per-frame ~47 Hz roughness<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="One per detected sub-bass event, along the bottom edge of the main and sub-bass panels. Hover a dot for that event's tags (name value·confidence), with an accelerometer-gap note where onset-sharpness couldn't be corroborated."><span class="sw" style="background:#dcdcdc;opacity:.55"></span><b>tag-event dots</b> &mdash; hover a dot for an event's tags<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="Windows where mid + high co-spike (the speech signature). Roughness there is contaminated by voices, not road."><span class="sw" style="background:#ff7bac;height:8px"></span><b>pink ribbon</b> &mdash; likely talking<span class="more">&#9432;</span></div>
-        </div>
-        <div class="panel gloss" aria-label="Glossary">
-          <h3>Glossary</h3>
-          <div class="glz" tabindex="0" data-tip="The bold line is a centered moving average over the 'smooth' width; the faint line under it is the raw 1 s value. Widen the slider to collapse per-second jitter into a trend."><b>Envelope</b> &mdash; smoothed roughness trend<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="Same baseline+delta grammar as the other bands, but the line is folded against structure: blue = tonal (engine, habituated) → yellow = chaotic (road, novel). Thickness redundantly encodes chaos so it stays legible without colour. Chaos = spectral flatness (1 − tonality) within 20–80 Hz."><b>folded sub-bass</b> &mdash; hue <span style="color:#3a6fd8">tonal</span>&rarr;<span style="color:#ebd73c">chaos</span>, thickness = chaos<span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="Auto-detected sections: stops (grey), rough / saturated stretches (red), and smooth-cruise sections (blue)."><b>shaded bands</b> &mdash; auto <span style="color:#9a9a9a">stops</span> / <span style="color:#ff785a">rough</span> / <span style="color:#4da3ff">cruise</span><span class="more">&#9432;</span></div>
-          <div class="glz" tabindex="0" data-tip="The flat-top plateaus are the SCORE_SCALE saturation, kept as-is to calibrate against felt annotations."><b id="satpct">…</b>% of windows pinned at roughness 100<span class="more">&#9432;</span></div>
-        </div>
-      </div>
     </div>
 
-    <!-- Secondary view: the 4-band spectral-chaos ribbon (sub-bass/low/mid/high chaos) — this is
-         where low/mid/high chaos lives (the timeline folds only sub-bass). Same worker output. -->
+    <!-- Secondary view: per-band spectral-chaos ribbon. Shows low/mid/high CHAOS (tonal→noise),
+         which the timeline does not — the timeline folds chaos into sub-bass only and draws
+         low/mid/high as level. Sub-bass is omitted here to avoid restating the folded panel. Same
+         worker output; the tag-event dots match the timeline's. -->
     <section id="ribbon-wrap" hidden aria-label="Spectral-chaos ribbon">
       <h2 class="ribbon-h">Per-band spectral-chaos ribbon</h2>
-      <p class="viz-sub">Chaos (spectral flatness, <span style="color:#3a6fd8">tonal</span>→<span style="color:#ebd73c">noise</span>) for each band. The timeline above folds chaos into the <b>sub-bass</b> panel only and shows low/mid/high as <i>level</i> — so the <b>low / mid / high</b> rows here are the one place per-band chaos is shown; the sub-bass row restates the timeline's folded panel.</p>
+      <p class="viz-sub">Chaos (spectral flatness, <span style="color:#3a6fd8">tonal</span>→<span style="color:#ebd73c">noise</span>) for <b>low / mid / high</b> — the one place per-band chaos is shown, since the timeline draws these bands as <i>level</i> and folds chaos into sub-bass only. Dots mark the same tagged events as the timeline.</p>
       <div id="ribbon-chart"></div>
     </section>
 

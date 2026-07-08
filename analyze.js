@@ -14,6 +14,7 @@
     summary: document.getElementById("summary"),
     status: document.getElementById("status"),
     analysisStatus: document.getElementById("analysis-status"),
+    legendWrap: document.getElementById("legend-wrap"),
     timelineWrap: document.getElementById("timeline-wrap"),
     ribbonWrap: document.getElementById("ribbon-wrap"),
     ribbonChart: document.getElementById("ribbon-chart")
@@ -136,6 +137,7 @@
   }
 
   function startAnalysis(wavFile, sidecar) {
+    el.legendWrap.hidden = true;
     el.timelineWrap.hidden = true;
     el.ribbonWrap.hidden = true;
     el.analysisStatus.textContent = "Decoding and scoring on your device… (a long capture can take several seconds)";
@@ -168,6 +170,7 @@
     if (!lastResult || !window.SensoryNavTimeline) return;
     const label = (picked.wav && picked.wav.name) || "capture";
     const audioUrl = isLocal() ? URL.createObjectURL(wavFile) : null;
+    el.legendWrap.hidden = false;
     el.timelineWrap.hidden = false;
     window.SensoryNavTimeline.drawTimeline(
       { scored: lastResult.scored, hires: lastResult.hires, squelch: lastResult.squelch, tags: lastResult.tags },
@@ -175,12 +178,16 @@
     );
   }
 
-  // The 4-band chaos ribbon (sub-bass/low/mid/high) via the SHARED ribbon renderer — this is where
-  // low/mid/high chaos is shown (the timeline folds only sub-bass).
+  // Per-band chaos ribbon via the SHARED ribbon renderer — LOW/MID/HIGH only. Sub-bass chaos is
+  // already the timeline's folded panel, so it is omitted here (showing the same data twice, drawn
+  // differently, is exactly the inconsistency to avoid). Tags are passed so the ribbon marks the
+  // same tag-events the timeline does.
   function showRibbon() {
     if (!lastResult || !window.SensoryNavRibbon || !el.ribbonChart) return;
     const label = (picked.wav && picked.wav.name) || "capture";
-    window.SensoryNavRibbon.drawRibbon({ squelch: lastResult.squelch }, { label: label }, el.ribbonChart);
+    const bandsOnly = Object.assign({}, lastResult.squelch);
+    delete bandsOnly.subbass; delete bandsOnly.subbass_floor; // drop the row the timeline already folds
+    window.SensoryNavRibbon.drawRibbon({ squelch: bandsOnly, tags: lastResult.tags }, { label: label }, el.ribbonChart);
     el.ribbonWrap.hidden = false;
   }
 
