@@ -2,10 +2,10 @@
 
 **TL;DR:** The on-device analyze page (record → score in a Web Worker → timeline + ribbon, plus a
 capture→analyze hand-off) is **built, committed, and browser-verified**. The two deploy-blockers
-(reuse-inventory regen D1, deploy allowlist D2) and the minor-findings triage (D3) are now **done**
-(commits `6050f99` + pending). Three items remain: **T12** scoring budget check, the **final Opus
-whole-branch review**, and the **on-device capture test** (needs a phone). Nothing is broken —
-finish-work.
+(reuse-inventory regen D1, deploy allowlist D2), the minor-findings triage (D3), and the scoring
+budget check (T12, closed as satisfied-in-practice on the A16) are now **done**. Two items remain:
+the **final Opus whole-branch review** and the **on-device capture test** (needs a phone) — plus a
+new UI-fix backlog (R1/R2/R3). Nothing is broken — finish-work.
 
 ## Contents
 - [Working state / how to run](#working-state--how-to-run)
@@ -78,11 +78,14 @@ Three follow-up UI fixes, specced with decisions locked in
 - **R3** — **chaos statistics** (median, binned-mode, peak, std-dev) per band + total (weighted
   composite headline + pooled), behind a ⓘ info icon top-right of the spectral-chaos region.
 
-### T12. Scoring time/memory budget (from the plan, Task 12)
-Never formalized. Informally ~seconds for the 10-min JC4 pass in-browser, no acceptance check.
-- **Target (spec §3):** ≤ ~15 s scoring, ≤ ~500 MB peak worker memory on a Samsung Galaxy A16.
+### T12. Scoring time/memory budget — ✅ CLOSED (2026-07-09, satisfied in practice)
+Target (spec §3): ≤ ~15 s scoring, ≤ ~500 MB peak worker memory on a Samsung Galaxy A16.
+**Closed by the owner on empirical evidence:** the A16 (our weakest target device) scores full
+10-min captures on the analyze page repeatedly without freezing or crashing — the budget is met in
+practice, so no formal acceptance gate or instrumentation was added. If performance is ever revisited,
+add a worker `postMessage` of elapsed ms + `performance.memory` peak to capture a hard number.
 - **Refs:** plan `docs/superpowers/plans/2026-07-07-analyze-ondevice-timeline-parity.md` (Task 12);
-  spec `docs/superpowers/specs/2026-07-07-analyze-ondevice-timeline-parity-design.md` §3 "Budgets".
+  spec `…-analyze-ondevice-timeline-parity-design.md` §3 "Budgets".
 
 ### T-review. Final whole-branch review (Opus)
 Not run. **Important:** all the inline UI work this session (renderers, `analyze.js`, hover/ticks/scale,
