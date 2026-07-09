@@ -119,31 +119,47 @@
       return rows;
     }
     function hideHover() { hoverG.innerHTML = ""; tt.style.display = "none"; }
+    const TICK_SNAP_PX = 9; // snap the crosshair to an event tick when the cursor is within this many px of it
+    const shortName = (label) => label.split(" ")[0]; // "sub-bass 20–80 Hz" -> "sub-bass"
     svgEl.addEventListener("mousemove", function (e) {
       const r = svgEl.getBoundingClientRect(), scale = r.width / W;
       const sx = (e.clientX - r.left) / scale, sy = (e.clientY - r.top) / scale;
-      const m = meta.find((mm) => sy >= mm.top && sy <= mm.top + hP);
-      if (!m || sx < mL || sx > mL + plotW) { hideHover(); return; }
-      const t = (sx - mL) / plotW * m.maxT;
-      const p = nearest(m.pts, t), hw = (p.chaos || 0) * CHAOS_DB;
-      const xt = m.x(p.t), yUp = m.y(p.level_db + hw), yLo = m.y(p.level_db - hw), yMid = m.y(p.level_db);
-      hoverG.innerHTML =
-        '<line x1="' + xt.toFixed(1) + '" y1="' + m.top + '" x2="' + xt.toFixed(1) + '" y2="' + (m.top + hP) + '" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>' +
-        '<circle cx="' + xt.toFixed(1) + '" cy="' + yUp.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
-        '<circle cx="' + xt.toFixed(1) + '" cy="' + yLo.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
-        '<circle cx="' + xt.toFixed(1) + '" cy="' + yMid.toFixed(1) + '" r="2" fill="' + m.band.line + '"/>';
-      // pixels-per-second at this band -> a ~6px hit window for "near an event tick"
-      const near = nearestEvent(t, m.maxT);
-      const nearPx = near ? Math.abs(m.x((near.ev.t_start + near.ev.t_end) / 2) - xt) : Infinity;
-      let html = "<b>" + esc(m.band.label) + "</b><br>t " + p.t.toFixed(1) + "s · level <b>" + p.level_db.toFixed(1) +
-        "</b> dB<br>chaos <b>" + (p.chaos || 0).toFixed(2) + "</b> · tonality " + (p.tonality == null ? "—" : p.tonality.toFixed(2)) + " · &plusmn;" + hw.toFixed(1) + " dB";
-      if (near && nearPx <= 6) html += '<hr style="border:none;border-top:1px solid #444;margin:5px 0">' + eventTagsHtml(near.ev);
+      const hovered = meta.find((mm) => sy >= mm.top && sy <= mm.top + hP);
+      if (!hovered || sx < mL || sx > mL + plotW) { hideHover(); return; }
+      const rawT = (sx - mL) / plotW * hovered.maxT;
+      // R1: near the BASE of a band, snap the crosshair to the nearest event tick (matches the
+      // timeline model: values track the line, events snap at the base). Elsewhere track the cursor.
+      const nearBase = sy >= hovered.top + hP - 10;
+      const evNear = nearestEvent(rawT, hovered.maxT);
+      const evPx = evNear ? Math.abs(hovered.x((evNear.ev.t_start + evNear.ev.t_end) / 2) - sx) : Infinity;
+      const snappedEvent = (nearBase && evNear && evPx <= TICK_SNAP_PX) ? evNear.ev : null;
+      const snapT = snappedEvent ? (snappedEvent.t_start + snappedEvent.t_end) / 2 : rawT;
+      // R2: draw the guide segment + dots on EVERY band at the same (snapped) time, and list every
+      // band's value in one tooltip — hovering any band reads them all at that instant.
+      let g = "", rows = "";
+      meta.forEach((m) => {
+        const p = nearest(m.pts, snapT), hw = (p.chaos || 0) * CHAOS_DB;
+        const xt = m.x(p.t), yUp = m.y(p.level_db + hw), yLo = m.y(p.level_db - hw), yMid = m.y(p.level_db);
+        const on = m === hovered, lineOp = snappedEvent ? 0.5 : (on ? 0.4 : 0.22);
+        g += '<line x1="' + xt.toFixed(1) + '" y1="' + m.top + '" x2="' + xt.toFixed(1) + '" y2="' + (m.top + hP) +
+          '" stroke="rgba(255,255,255,' + lineOp + ')" stroke-width="1"/>' +
+          '<circle cx="' + xt.toFixed(1) + '" cy="' + yUp.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
+          '<circle cx="' + xt.toFixed(1) + '" cy="' + yLo.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
+          '<circle cx="' + xt.toFixed(1) + '" cy="' + yMid.toFixed(1) + '" r="2" fill="' + m.band.line + '"/>';
+        rows += '<div' + (on ? ' style="color:#fff"' : '') + '><span style="display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:baseline;margin-right:5px;background:' +
+          m.band.line + '"></span>' + esc(shortName(m.band.label)) + ' <b>' + p.level_db.toFixed(1) + '</b> dB · chaos <b>' +
+          (p.chaos || 0).toFixed(2) + '</b> · ton ' + (p.tonality == null ? "—" : p.tonality.toFixed(2)) + "</div>";
+      });
+      hoverG.innerHTML = g;
+      let html = '<div style="color:#9fb7d4;margin-bottom:3px">t <b>' + snapT.toFixed(1) + "</b> s</div>" + rows;
+      if (snappedEvent) html += '<hr style="border:none;border-top:1px solid #444;margin:5px 0">' + eventTagsHtml(snappedEvent);
       tt.innerHTML = html;
       tt.style.display = "block";
-      let left = xt * scale - tt.offsetWidth / 2;
+      const xtH = hovered.x(nearest(hovered.pts, snapT).t);
+      let left = xtH * scale - tt.offsetWidth / 2;
       left = Math.max(2, Math.min(r.width - tt.offsetWidth - 2, left));
       tt.style.left = left.toFixed(0) + "px";
-      tt.style.top = ((m.top + hP) * scale + 6).toFixed(0) + "px";
+      tt.style.top = ((hovered.top + hP) * scale + 6).toFixed(0) + "px";
     });
     svgEl.addEventListener("mouseleave", hideHover);
   }
