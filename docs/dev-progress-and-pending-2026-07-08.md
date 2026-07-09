@@ -72,9 +72,9 @@ Three follow-up UI fixes, specced with decisions locked in
 **`docs/changelog-2026-07-09-ribbon-hover-and-chaos-stats.md`**:
 - **R1** — ribbon hover must also snap to the base **event tick marks** (not only the chaos-line
   peaks), matching the timeline's tick-snap.
-- **R2** — **synchronized cross-panel hover**: hovering one section draws the guide line + dots +
-  tooltip on all sections at that time, spanning BOTH the roughness panel (timeline renderer) and
-  the chaos bands (ribbon renderer). Needs a shared hovered-time signal, not a third hover copy.
+- **R2** — **synchronized hover within a panel**: hovering one section draws the guide line + dots +
+  tooltip on all 4–5 sections of that **same** chart at that time. Per-renderer, does NOT cross
+  between the ribbon and the timeline. Primary work is the ribbon (sync across its 4 bands).
 - **R3** — **chaos statistics** (median, binned-mode, peak, std-dev) per band + total (weighted
   composite headline + pooled), behind a ⓘ info icon top-right of the spectral-chaos region.
 

@@ -15,18 +15,15 @@ cycle). Each item is self-contained; check off as landed. Touches the shared rib
   - **Where:** `ribbon-render.js` hover handler (the `sources.tags` event ticks + guide-line logic).
   - **Ref parity:** the timeline's tick-snap from the 2026-07-08 batch (ticks + hover).
 
-- [ ] **R2. Synchronized cross-panel hover.** Hovering/snapping to a time in ONE section must render
-  the hover result on **every** section at that same time: guide line, band-edge dots, and tooltip.
-  Hovering the sub-bass shows the vertical segment + dots + tooltip on sub-bass, low, and mid/high
-  **and** the roughness panel (if roughness applies at that time) — spanning **both** the roughness
-  area (timeline) and the spectral-chaos area (ribbon).
-  - **Scope note:** this crosses the two SVG renderers (`timeline-render.js` roughness panel +
-    `ribbon-render.js` bands). Needs a shared "hovered time" signal so both draw a crosshair at the
-    same x. Likely a small hover-sync bus in `analyze.js` (or a shared module) that each renderer
-    subscribes to — do NOT fork the hover logic into a third copy.
-  - **Open decision:** does this sync apply only inside the analyze page (both charts present), or
-    also on the standalone `out/score/*.html` pages (which render one chart at a time)? Default:
-    analyze page first; standalone pages keep their existing per-chart hover.
+- [ ] **R2. Synchronized hover across all sections *within a panel*.** Hovering/snapping to a time in
+  ONE section must render the hover result on **every** section of that **same panel** at that same
+  time: guide line, band-edge dots, and tooltip. Hovering the ribbon's sub-bass shows the vertical
+  segment + dots + tooltip on sub-bass, low, and mid/high together at the same x.
+  - **Scope (owner-confirmed 2026-07-09): per-panel, single renderer — does NOT cross panels.** Each
+    chart syncs its own 4–5 sections internally; the ribbon and the timeline do **not** drive each
+    other. Primary work is the **ribbon** (`ribbon-render.js`): one hover handler → shared crosshair
+    down all 4 bands. The timeline (`timeline-render.js`, ~5 sections) already shares one hover
+    handler across its panels — verify it behaves this way and match; no cross-renderer bus.
 
 - [ ] **R3. Chaos statistics under an info icon (top-right of the spectral-chaos region).** Show
   per-band **and** total: **median, mode, peak (max), and standard deviation** of **spectral chaos**
