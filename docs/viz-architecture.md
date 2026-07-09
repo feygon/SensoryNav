@@ -43,9 +43,12 @@ decode + scoring pipeline; `SensoryNavCore` the recorder pieces.
 
 | Module | What it is / when to use | Exports · global |
 |---|---|---|
-| `ribbon-render.js` | the ONE spectral-chaos ribbon renderer. Used by BOTH scripts/squelch-ribbon.js (which produces out/score/ribbon-*.html) and analyze.html, so the two are byte-identical. Renders subbass/low/mid/high from a squelch-clean.json shape:… | `drawRibbon` · `SensoryNavRibbon` |
+| `pipeline.js` | the shared pipeline/tier strip shown across the whole app: Capture -> Local analysis -> Deidentified upload -> Aggregator -> Route map, with live/planned badges. ONE source so the visual stays identical on every page. Auto-mounts into… | — · `SensoryNavPipeline` |
+| `ribbon-render.js` | the ONE spectral-chaos ribbon renderer. Used by BOTH scripts/squelch-ribbon.js (which produces out/score/ribbon-*.html) and analyze.html. Renders subbass/low/mid/high from a squelch-clean.json shape: centre line = band level (dB),… | `drawRibbon` · `SensoryNavRibbon` |
+| `timeline-render.js` | the ONE stacked-timeline renderer. Used by BOTH scripts/plot-timeline.js (out/score/timeline-*.html) and analyze.html, so the two are byte-identical. Reads the pipeline's scored/hires/squelch/tags data objects and renders the SVG panels… | `buildData`, `chartClient`, `drawTimeline` · `SensoryNavTimeline` |
 | `recorder/audio-scoring.js` | — | `bandEnergiesFromSpectrum`, `averageWindowEnergies`, `bandForFrequency`, `roughnessScore`, `roughnessScoreRaw` · `SensoryNavCore` |
 | `recorder/calibration.js` | — | `computeBaseline`, `median` · `SensoryNavCore` |
+| `recorder/capture-handoff.js` | one-shot IndexedDB stash that hands a just-recorded capture (WAV blob + sidecar manifest) from the capture page to the analyze page across a navigation. A ~50 MB WAV is far too big for sessionStorage, so IndexedDB stores the blob… | — · `SensoryNavHandoff` |
 | `recorder/capture-manifest.js` | — | `buildManifest`, `SCHEMA` · `SensoryNavCore` |
 | `recorder/capture-state.js` | — | `nextState` · `SensoryNavCore` |
 | `recorder/constants.js` | — | `CONSTANTS` · `SensoryNavCore` |
@@ -56,10 +59,27 @@ decode + scoring pipeline; `SensoryNavCore` the recorder pieces.
 | `recorder/session-export.js` | — | `buildSession`, `validateSession`, `SCORE_FORMULA_VERSION` · `SensoryNavCore` |
 | `recorder/trim-capture.js` | — | `trimCapture` · `SensoryNavCore` |
 | `recorder/wav-encoder.js` | — | `encodeWav`, `floatTo16BitPCM` · `SensoryNavCore` |
+| `harness/audio/audio-windows.js` | — | `framesToWindows`, `windowIndexFor`, `stft` · `SensoryNavScore` |
+| `harness/audio/fft.js` | — | `realFftDb` · `SensoryNavScore` |
+| `harness/audio/load-pass.js` | — | `loadPass`, `windowsFromSamples` · `SensoryNavScore` |
 | `harness/audio/wav-decoder.js` | — | `decodeWav` · `SensoryNavScore` |
 | `harness/score/baseline.js` | — | `fitBaseline`, `floorAt`, `globalFloorAt`, `baselineMeta` · `SensoryNavScore` |
 | `harness/score/metrics.js` | — | `quantile`, `weightedQuantile`, `spearman`, `weightedSpearman`, `rocAuc`, `precisionRecall`, `bestF1Threshold` · `SensoryNavScore` |
+| `harness/score/reliability.js` | — | `windowReliability` · `SensoryNavScore` |
+| `harness/score/research-scorer.js` | Pure, worker-callable RESEARCH scorer: flag talking windows (mid+high co-spike, via the shared speech-detect.js), EXCLUDE them from the speed-conditioned baseline, then score every window with the canonical band weights (low 0.6 / mid… | `scoreResearch` · `SensoryNavScore` |
+| `harness/score/roughness-db.js` | Delta-dB roughness: how many decibels a window's band energy sits ABOVE that run's own speed-conditioned baseline floor.  Architecture (deliberate): the baseline — the road/tire/car/condition noise expected at a given speed — is a… | `toDb`, `bandDeltaDb`, `roughnessDb`, `EPS_ENERGY`, `BANDS` · `SensoryNavScore` |
+| `harness/score/score-frontend.js` | Shared "front-end" for on-device / research scoring: decode WAV -> SP1 windows (framesToWindows) -> STFT frames -> SP2 Kalman motion track, indexed by window_id. Both scripts/score-research.js and scripts/squelch-extract.js compute this… | `buildFrontEnd` · `SensoryNavScore` |
 | `harness/score/spectral-chaos.js` | — | `fft`, `hann`, `powerSpectrum`, `SBANDS`, `tonality`, `PEAK_K`, `median`, `computeSpectralChaos`, `BAND_SNR_MIN` · `SensoryNavScore` |
+| `harness/score/speech-detect.js` | Talking/speech detector, extracted verbatim from scripts/score-research.js so the on-device worker and the (thin) research scorer share ONE detector. Feeds BOTH the baseline talking-exclusion (windows where isTalking(i) is true are… | `detectSpeech`, `HI`, `MID`, `SPEECH_FRAMES` · `SensoryNavScore` |
+| `harness/score/squelch-derive.js` | Pure, worker-callable squelch derivation: runs the spectral-chaos DSP (subbass/low/mid/ high tonality-chaos ribbons), joins it against the SP1+SP2 scored-window series (speed/ lat/lon/reliability) already computed by buildFrontEnd (Task… | `deriveSquelch` · `SensoryNavScore` |
+| `harness/score/validate.js` | — | `validatePass`, `validateBatch` · `SensoryNavScore` |
+| `harness/motion/geo-project.js` | — | `projectFixes`, `bearingDeg`, `R_EARTH` · `SensoryNavScore` |
+| `harness/motion/kalman-smoother.js` | — | `smooth`, `evaluateAt`, `forwardFilter`, `rtsBackward`, `INIT_VEL_VAR` · `SensoryNavScore` |
+| `harness/motion/linalg.js` | — | `matMul`, `transpose`, `identity`, `matAdd`, `matSub`, `scale`, `solve` · `SensoryNavScore` |
+| `harness/motion/motion-track.js` | — | `buildMotionTrack`, `classifyWindow`, `confidenceFromCov`, `sortDedupFixes` · `SensoryNavScore` |
+| `harness/tags/events.js` | — | `detectEvents` · `SensoryNavScore` |
+| `harness/tags/extract.js` | — | `confidence`, `extractTags`, `ACCEL_CAP` · `SensoryNavScore` |
+| `harness/tags/schema.js` | — | `validateTag`, `loadRegistry`, `DOMAINS`, `ACCEL` · `SensoryNavScore` |
 
 ## How to reuse
 
