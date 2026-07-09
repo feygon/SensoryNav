@@ -1,0 +1,51 @@
+name: Tests
+
+# Runs the Node test suite (`npm test`) on every push and PR. Kept SEPARATE from the deploy
+# workflow on purpose: this job holds NO deploy secrets and only needs read access, so running the
+# test scripts here is safe under the supply-chain rule (never run lifecycle/build scripts in a job
+# that holds the deploy token). Like deploy-pages.yml it uses ZERO marketplace actions — pure git +
+# the built-in GITHUB_TOKEN — so there is no third-party action to vet or pin to a commit SHA.
+#
+# This is the job that turns test-based gates into ENFORCEMENT rather than a local convention. When
+# scripts/generate-scorer-registry.js is wired into `npm test`, a missing or invalid @unit-begin
+# frontmatter block (or a dangling tested-by, an unexported contract fn, a `mutates: setting:*`)
+# fails this job automatically — the frontmatter can no longer silently rot.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read # least privilege: only needs to read the repo to test it
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the tested commit (no marketplace action)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Fetch exactly the pushed/PR commit by SHA (works on any branch and on PR merge refs;
+          # GitHub allows fetching a specific reachable SHA), then check it out detached.
+          mkdir src && cd src
+          git init --quiet
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch --quiet --depth 1 origin "$SHA"
+          git checkout --quiet FETCH_HEAD
+
+      - name: Run the test suite
+        working-directory: src
+        run: |
+          set -euo pipefail
+          node --version
+          # The suite is pure Node (built-ins only) — no `npm ci` / dependency install needed, so
+          # this job installs nothing (nothing to vet, nothing to lock).
+          npm test
