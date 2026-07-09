@@ -32,7 +32,7 @@ cycle). Each item is self-contained; check off as landed. Touches the shared rib
     timeline's ~5 sections is a separate follow-up — flagged for owner confirmation before doing it,
     since the explicit complaint was the ribbon.
 
-- [ ] **R3. Chaos statistics under an info icon (top-right of the spectral-chaos region).** Show
+- [x] **R3. Chaos statistics under an info icon (top-right of the spectral-chaos region).** Show
   per-band **and** total: **median, mode, peak (max), and standard deviation** of **spectral chaos**
   across the whole trip. Put it behind a small ⓘ info icon in the top-right of the spectral-chaos
   region so it stays out of the way until opened (popover/panel on click; dark-mode-correct, no
@@ -49,6 +49,10 @@ cycle). Each item is self-contained; check off as landed. Touches the shared rib
   - **Where:** `ribbon-render.js` header area (add the ⓘ + popover); stats computed from the same
     squelch series the ribbon already has, so no re-derivation. Only NaN/null samples excluded
     (bands can have null gaps where SNR is too low).
+  - **Done:** ⓘ button top-right of the ribbon; click toggles a dark popover (`#1b1b1b`, no pure-white)
+    with a per-band table (median · binned-mode · peak · σ · n) plus `total · weighted` (low0.6/mid0.3/
+    high0.1 composite, rule-separated) and `total · pooled`. Closes on ×, outside-click, or Esc.
+    Browser-verified on jc4 (pooled n = 2444 + 2445×3 = 9779; weighted peak 0.926 < 1.0 as expected).
 
 ## Notes
 - R1/R2 touch the SHARED renderers → the standalone `out/score/*.html` pages inherit R1 (fine);

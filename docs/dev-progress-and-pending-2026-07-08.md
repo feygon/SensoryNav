@@ -68,15 +68,16 @@ Dispositions recorded in `.superpowers/sdd/progress.md` ("D3 minor-findings tria
 ## Pending — development
 
 ### UI-fix backlog (2026-07-09) — ribbon hover + chaos stats
-Three follow-up UI fixes, specced with decisions locked in
-**`docs/changelog-2026-07-09-ribbon-hover-and-chaos-stats.md`**:
-- **R1** — ribbon hover must also snap to the base **event tick marks** (not only the chaos-line
-  peaks), matching the timeline's tick-snap.
-- **R2** — **synchronized hover within a panel**: hovering one section draws the guide line + dots +
-  tooltip on all 4–5 sections of that **same** chart at that time. Per-renderer, does NOT cross
-  between the ribbon and the timeline. Primary work is the ribbon (sync across its 4 bands).
-- **R3** — **chaos statistics** (median, binned-mode, peak, std-dev) per band + total (weighted
-  composite headline + pooled), behind a ⓘ info icon top-right of the spectral-chaos region.
+Specced with decisions locked in **`docs/changelog-2026-07-09-ribbon-hover-and-chaos-stats.md`**.
+All three landed in `ribbon-render.js` and browser-verified on jc4:
+- **R1** ✅ — ribbon hover snaps to the base **event tick marks** (near-base-gated, within 9px) and
+  surfaces the event's tags.
+- **R2** ✅ — **synchronized hover within the ribbon**: hovering any band draws the crosshair + dots on
+  all 4 bands and lists them in one tooltip. Per-renderer (does not cross into the timeline).
+  *Open follow-up:* extend the same per-panel sync to the timeline's ~5 sections (currently marks only
+  the hovered panel) — flagged for owner confirmation, not yet done.
+- **R3** ✅ — **chaos statistics** popover (median, binned-mode, peak, σ, n) per band + `total·weighted`
+  (0.6/0.3/0.1 composite) and `total·pooled`, behind a ⓘ top-right of the ribbon.
 
 ### T12. Scoring time/memory budget — ✅ CLOSED (2026-07-09, satisfied in practice)
 Target (spec §3): ≤ ~15 s scoring, ≤ ~500 MB peak worker memory on a Samsung Galaxy A16.
