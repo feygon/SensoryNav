@@ -67,6 +67,17 @@ Dispositions recorded in `.superpowers/sdd/progress.md` ("D3 minor-findings tria
 
 ## Pending — development
 
+### UI-fix backlog (2026-07-09) — ribbon hover + chaos stats
+Three follow-up UI fixes, specced with decisions locked in
+**`docs/changelog-2026-07-09-ribbon-hover-and-chaos-stats.md`**:
+- **R1** — ribbon hover must also snap to the base **event tick marks** (not only the chaos-line
+  peaks), matching the timeline's tick-snap.
+- **R2** — **synchronized cross-panel hover**: hovering one section draws the guide line + dots +
+  tooltip on all sections at that time, spanning BOTH the roughness panel (timeline renderer) and
+  the chaos bands (ribbon renderer). Needs a shared hovered-time signal, not a third hover copy.
+- **R3** — **chaos statistics** (median, binned-mode, peak, std-dev) per band + total (weighted
+  composite headline + pooled), behind a ⓘ info icon top-right of the spectral-chaos region.
+
 ### T12. Scoring time/memory budget (from the plan, Task 12)
 Never formalized. Informally ~seconds for the 10-min JC4 pass in-browser, no acceptance check.
 - **Target (spec §3):** ≤ ~15 s scoring, ≤ ~500 MB peak worker memory on a Samsung Galaxy A16.
