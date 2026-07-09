@@ -11,6 +11,10 @@
 // stay visually identical).
 (function () {
   "use strict";
+  // Document-level listeners for the R3 stats popover (close on outside-click / Esc). Held at module
+  // scope so a re-render (e.g. a second file drop on the analyze page) removes the previous render's
+  // handlers before adding new ones, instead of accumulating detached closures.
+  let statsDocHandlers = null;
   function drawRibbon(sources, cfg, mount) {
     const sq = sources.squelch;
     if (!sq) { mount.textContent = "no squelch data"; return; }
@@ -164,8 +168,14 @@
     statBtn.addEventListener("click", function (e) { e.stopPropagation(); openStats(statBox.style.display === "none"); });
     mount.querySelector("#ribbon-stats-x").addEventListener("click", function () { openStats(false); });
     statBox.addEventListener("click", function (e) { e.stopPropagation(); });
-    document.addEventListener("click", function () { openStats(false); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") openStats(false); });
+    // Remove the previous render's document handlers before registering this render's, so repeated
+    // draws don't leak listeners bound to now-detached stat boxes.
+    if (statsDocHandlers) { document.removeEventListener("click", statsDocHandlers.click); document.removeEventListener("keydown", statsDocHandlers.key); }
+    const onDocClick = function () { openStats(false); };
+    const onDocKey = function (e) { if (e.key === "Escape") openStats(false); };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onDocKey);
+    statsDocHandlers = { click: onDocClick, key: onDocKey };
 
     // ---- hover: guide line + dots at the top/bottom of the chaos band + a value tooltip; near an
     // event tick the tooltip lists that event's tags (so the tags annotate the UI, not just the JSON).
@@ -203,17 +213,20 @@
       const snappedEvent = (nearBase && evNear && evPx <= TICK_SNAP_PX) ? evNear.ev : null;
       const snapT = snappedEvent ? (snappedEvent.t_start + snappedEvent.t_end) / 2 : rawT;
       // R2: draw the guide segment + dots on EVERY band at the same (snapped) time, and list every
-      // band's value in one tooltip — hovering any band reads them all at that instant.
+      // band's value in one tooltip — hovering any band reads them all at that instant. ONE shared
+      // crosshair x (from the hovered band) keeps the vertical line straight even if the bands' time
+      // grids differ slightly (sub-bass can be one sample shorter than low/mid/high).
+      const xC = hovered.x(nearest(hovered.pts, snapT).t);
       let g = "", rows = "";
       meta.forEach((m) => {
         const p = nearest(m.pts, snapT), hw = (p.chaos || 0) * CHAOS_DB;
-        const xt = m.x(p.t), yUp = m.y(p.level_db + hw), yLo = m.y(p.level_db - hw), yMid = m.y(p.level_db);
+        const yUp = m.y(p.level_db + hw), yLo = m.y(p.level_db - hw), yMid = m.y(p.level_db);
         const on = m === hovered, lineOp = snappedEvent ? 0.5 : (on ? 0.4 : 0.22);
-        g += '<line x1="' + xt.toFixed(1) + '" y1="' + m.top + '" x2="' + xt.toFixed(1) + '" y2="' + (m.top + hP) +
+        g += '<line x1="' + xC.toFixed(1) + '" y1="' + m.top + '" x2="' + xC.toFixed(1) + '" y2="' + (m.top + hP) +
           '" stroke="rgba(255,255,255,' + lineOp + ')" stroke-width="1"/>' +
-          '<circle cx="' + xt.toFixed(1) + '" cy="' + yUp.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
-          '<circle cx="' + xt.toFixed(1) + '" cy="' + yLo.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
-          '<circle cx="' + xt.toFixed(1) + '" cy="' + yMid.toFixed(1) + '" r="2" fill="' + m.band.line + '"/>';
+          '<circle cx="' + xC.toFixed(1) + '" cy="' + yUp.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
+          '<circle cx="' + xC.toFixed(1) + '" cy="' + yLo.toFixed(1) + '" r="3.2" fill="' + hue(p.tonality) + '" stroke="#111" stroke-width="0.8"/>' +
+          '<circle cx="' + xC.toFixed(1) + '" cy="' + yMid.toFixed(1) + '" r="2" fill="' + m.band.line + '"/>';
         rows += '<div' + (on ? ' style="color:#fff"' : '') + '><span style="display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:baseline;margin-right:5px;background:' +
           m.band.line + '"></span>' + esc(bandShort(m.band.label)) + ' <b>' + p.level_db.toFixed(1) + '</b> dB · chaos <b>' +
           (p.chaos || 0).toFixed(2) + '</b> · ton ' + (p.tonality == null ? "—" : p.tonality.toFixed(2)) + "</div>";
@@ -223,8 +236,7 @@
       if (snappedEvent) html += '<hr style="border:none;border-top:1px solid #444;margin:5px 0">' + eventTagsHtml(snappedEvent);
       tt.innerHTML = html;
       tt.style.display = "block";
-      const xtH = hovered.x(nearest(hovered.pts, snapT).t);
-      let left = xtH * scale - tt.offsetWidth / 2;
+      let left = xC * scale - tt.offsetWidth / 2;
       left = Math.max(2, Math.min(r.width - tt.offsetWidth - 2, left));
       tt.style.left = left.toFixed(0) + "px";
       tt.style.top = ((hovered.top + hP) * scale + 6).toFixed(0) + "px";

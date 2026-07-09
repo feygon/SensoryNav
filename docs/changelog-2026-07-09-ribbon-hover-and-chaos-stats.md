@@ -58,5 +58,22 @@ cycle). Each item is self-contained; check off as landed. Touches the shared rib
 
 ## Notes
 - R1/R2 touch the SHARED renderers → the standalone `out/score/*.html` pages inherit R1 (fine);
-  R2's cross-panel sync is analyze-page-scoped by default (see R2 open decision).
+  R2 syncs within each renderer (ribbon bands; timeline panels), not across them.
 - R3 is additive UI; the underlying per-band chaos series already exists in `squelch-clean.json`.
+
+## Post-review fixes (whole-branch review, 2026-07-09)
+A Senior-reviewer pass over `8389e58..HEAD` (no Critical). Fixed:
+- **Important — timeline stride-rounding OOB:** `drawLowAt`/`drawMHAt` (and the `peakSnap` centres in
+  `showHover`) rounded a hires index UP to a stride multiple, which could exceed the last array index
+  → `hr.lo[i]` undefined → `toFixed` throw at the plot's right edge. Now clamped with
+  `Math.min(len-1, …)`. Browser-verified: far-right hover across all panels renders valid tooltips at
+  t≈608–610s (maxT) with **zero exceptions**.
+- **Important — deploy MODULES extraction failed OPEN:** if the `sed`/`grep` parse yielded nothing
+  (e.g. the `var MODULES = [` form changed), the copy loop ran zero times and the job exited 0,
+  shipping a worker that 404s. Now fails CLOSED: aborts if fewer than 20 modules parse (loosened the
+  match to any `MODULES = [` declaration). Verified locally: 22 modules parsed, guard passes.
+- **Minor:** ribbon R3 popover leaked a `document` click/keydown listener per re-render → now removes
+  the prior render's handlers (module-scoped registry). Ribbon hover now uses ONE shared crosshair x
+  across bands (was per-band). `analyze.js` revokes the previous object URL before minting a new one.
+- Re-verified in-browser: ribbon single guide x + 4-band tooltip + 6-row stats; timeline right-edge
+  no-throw. Full suite green (48 files).

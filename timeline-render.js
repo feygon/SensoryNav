@@ -635,13 +635,16 @@ function chartClient(D) {
     return { marks: marks, rows: ttSub(sq) };
   }
   function drawLowAt(tS, xC) {
-    var hr = D.hires, sL = bandStride(), i = Math.round(hiresIdx(tS) / sL) * sL, rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec;
+    // round to a stride multiple (dot sits on the drawn vertex), but clamp — rounding UP can exceed
+    // the last index and make hr.lo[i] undefined -> toFixed throws.
+    var hr = D.hires, sL = bandStride(), i = Math.min(hr.lo.length - 1, Math.round(hiresIdx(tS) / sL) * sL);
+    var rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec;
     var marks = segSvg(xC, lowTop, lowTop + lowH, GUIDE_C, 1) + segSvg(xC, yDbLow(rec), yDbLow(base), C_LO, 1.4)
       + dotSvg(xC, yDbLow(base), C_LOF) + dotSvg(xC, yDbLow(rec), C_LO);
     return { marks: marks, rows: ttRow(C_LO, "low", rec, base) };
   }
   function drawMHAt(tS, xC) {
-    var hr = D.hires, sM = bandStride(), j = Math.round(hiresIdx(tS) / sM) * sM;
+    var hr = D.hires, sM = bandStride(), j = Math.min(hr.mi.length - 1, Math.round(hiresIdx(tS) / sM) * sM);
     var mr = hr.mi[j], mb = hr.floMi ? hr.floMi[j] : mr, hrr = hr.hi[j], hb = hr.floHi ? hr.floHi[j] : hrr;
     var marks = segSvg(xC, mhTop, mhTop + mhH, GUIDE_C, 1)
       + segSvg(xC, yDbMH(mr), yDbMH(mb), C_MI, 1.4) + dotSvg(xC, yDbMH(mb), C_MIF) + dotSvg(xC, yDbMH(mr), C_MI)
@@ -671,8 +674,8 @@ function chartClient(D) {
     else if (panel === "sub" && sy >= subTop + subH - 9 && sy <= subTop + subH + 1) ev = nearestEventNearX(sx);
     var tS;
     if (ev) tS = eventMidT(ev);
-    else if (panel === "low") { var sL = bandStride(); tS = hr.t0 + peakSnap(Math.round(hiresIdx(t) / sL) * sL, sL, [{ arr: hr.lo, base: hr.floLo }]) * hr.dt; }
-    else if (panel === "mh") { var sM = bandStride(); tS = hr.t0 + peakSnap(Math.round(hiresIdx(t) / sM) * sM, sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]) * hr.dt; }
+    else if (panel === "low") { var sL = bandStride(); tS = hr.t0 + peakSnap(Math.min(hr.lo.length - 1, Math.round(hiresIdx(t) / sL) * sL), sL, [{ arr: hr.lo, base: hr.floLo }]) * hr.dt; }
+    else if (panel === "mh") { var sM = bandStride(); tS = hr.t0 + peakSnap(Math.min(hr.mi.length - 1, Math.round(hiresIdx(t) / sM) * sM), sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]) * hr.dt; }
     else if (panel === "sub") tS = nearestSq(squelch.subbass, t).t;
     else tS = nearestPt(t).t;
     var xC = xf(tS);

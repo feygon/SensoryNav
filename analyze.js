@@ -20,7 +20,7 @@
     ribbonChart: document.getElementById("ribbon-chart")
   };
   const picked = { wav: null, json: null };
-  let worker = null, registry = null, lastResult = null;
+  let worker = null, registry = null, lastResult = null, lastAudioUrl = null;
 
   // --- WAV: parse just the header (sample rate / channels / duration), no decode of samples ---
   function parseWavHeader(buffer) {
@@ -169,7 +169,11 @@
   function showTimeline(wavFile) {
     if (!lastResult || !window.SensoryNavTimeline) return;
     const label = (picked.wav && picked.wav.name) || "capture";
+    // Revoke any object URL from a previous analysis before minting a new one, so re-dropping files
+    // doesn't leak the prior blob URL.
+    if (lastAudioUrl) { URL.revokeObjectURL(lastAudioUrl); lastAudioUrl = null; }
     const audioUrl = isLocal() ? URL.createObjectURL(wavFile) : null;
+    lastAudioUrl = audioUrl;
     el.legendWrap.hidden = false;
     el.timelineWrap.hidden = false;
     window.SensoryNavTimeline.drawTimeline(

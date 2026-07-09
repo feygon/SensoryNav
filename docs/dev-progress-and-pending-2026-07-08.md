@@ -2,10 +2,10 @@
 
 **TL;DR:** The on-device analyze page (record → score in a Web Worker → timeline + ribbon, plus a
 capture→analyze hand-off) is **built, committed, and browser-verified**. The two deploy-blockers
-(reuse-inventory regen D1, deploy allowlist D2), the minor-findings triage (D3), and the scoring
-budget check (T12, closed as satisfied-in-practice on the A16) are now **done**. Two items remain:
-the **final Opus whole-branch review** and the **on-device capture test** (needs a phone) — plus a
-new UI-fix backlog (R1/R2/R3). Nothing is broken — finish-work.
+(reuse-inventory regen D1, deploy allowlist D2), the minor-findings triage (D3), the scoring budget
+check (T12, closed on the A16), the R1/R2/R3 UI-fix backlog, and the **final whole-branch review**
+(merge-with-fixes; all fixes applied + re-verified) are now **done**. One item remains: the
+**on-device capture test** (needs a phone). Nothing is broken — finish-work.
 
 ## Contents
 - [Working state / how to run](#working-state--how-to-run)
@@ -87,14 +87,16 @@ add a worker `postMessage` of elapsed ms + `performance.memory` peak to capture 
 - **Refs:** plan `docs/superpowers/plans/2026-07-07-analyze-ondevice-timeline-parity.md` (Task 12);
   spec `…-analyze-ondevice-timeline-parity-design.md` §3 "Budgets".
 
-### T-review. Final whole-branch review (Opus)
-Not run. **Important:** all the inline UI work this session (renderers, `analyze.js`, hover/ticks/scale,
-the hand-off) landed OUTSIDE the per-task SDD review loop, so the final review is where it gets
-scrutinized.
-- **How:** SDD final review = `superpowers:requesting-code-review` on `cb61137..HEAD` (or `8389e58..HEAD`
-  for just this plan's work), most-capable model. Package via
-  `.claude/plugins/.../subagent-driven-development/scripts/review-package <BASE> HEAD`.
-- **Feed it:** the D3 Minor list + the two "known gaps" below (CSP/eval, single-pass baseline).
+### T-review. Final whole-branch review — ✅ DONE (2026-07-09)
+Ran `superpowers:requesting-code-review` over `8389e58..HEAD` (general-purpose Senior reviewer).
+Verdict: **merge with fixes** — no Critical. Two Important + three Minor, all fixed and re-verified:
+- Important: timeline stride-rounding OOB (`drawLowAt`/`drawMHAt`/`peakSnap` centres) → clamped;
+  deploy MODULES extraction failed-open → now fails closed with a ≥20-module count guard.
+- Minor: ribbon popover `document` listener leak → removed-on-rerender; ribbon single shared crosshair
+  x; `analyze.js` object-URL revoke.
+- Details + browser re-verification in `docs/changelog-2026-07-09-ribbon-hover-and-chaos-stats.md`
+  ("Post-review fixes"). Full suite green.
+- The billed `/code-review ultra` cloud review remains available if you want a second, independent pass.
 
 ### T-device. On-device capture verification
 The record → Stop → (Analyze upon stopping) → analyze flow needs a real mic recording on the target
