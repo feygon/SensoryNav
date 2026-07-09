@@ -1,9 +1,11 @@
 # SensoryNav — dev progress & pending tasks (2026-07-08)
 
 **TL;DR:** The on-device analyze page (record → score in a Web Worker → timeline + ribbon, plus a
-capture→analyze hand-off) is **built, committed, and browser-verified**. Six items remain; the two
-that **block a clean deploy** are the reuse-inventory regen and the deploy allowlist. Nothing here is
-broken — this is finish-work.
+capture→analyze hand-off) is **built, committed, and browser-verified**. The two deploy-blockers
+(reuse-inventory regen D1, deploy allowlist D2) and the minor-findings triage (D3) are now **done**
+(commits `6050f99` + pending). Three items remain: **T12** scoring budget check, the **final Opus
+whole-branch review**, and the **on-device capture test** (needs a phone). Nothing is broken —
+finish-work.
 
 ## Contents
 - [Working state / how to run](#working-state--how-to-run)
@@ -40,29 +42,28 @@ review verdicts). UI batch: **`docs/changelog-2026-07-08-analyze-ui-and-handoff.
 
 ## Pending — documentation
 
-### D1. Regenerate the reuse inventory (OVERDUE — standing directive)
-`docs/viz-architecture.md` is stale: missing `timeline-render.js`, `recorder/capture-handoff.js`, and
-`harness/score/{score-frontend,speech-detect,research-scorer,squelch-derive}.js`.
-- **Fix:** `node scripts/generate-viz-inventory.js` then commit `docs/viz-architecture.md`.
-- **Why it kept slipping:** each subagent correctly reverted an incidental regen to stay in scope.
-- **Refs:** generator `scripts/generate-viz-inventory.js`; directive in project `CLAUDE.md`
-  ("Reuse before you build — the module inventory").
+### D1. Regenerate the reuse inventory — ✅ DONE (commit `6050f99`)
+`docs/viz-architecture.md` regenerated (`node scripts/generate-viz-inventory.js`); now lists
+`timeline-render.js`, `recorder/capture-handoff.js`, and the full harness scorer chain
+(`score-frontend`, `speech-detect`, `research-scorer`, `squelch-derive`, + motion/audio/tags modules).
 
-### D2. Complete the deploy allowlist
-`.github/workflows/deploy-pages.yml` (has an **uncommitted** edit) is missing web files → the
-deployed analyze worker would 404.
-- **Add to the `for f in …` web loop:** `timeline-render.js`, `timeline.css`.
-- **Add a copy for:** `harness/tags/registry.json` and `harness/score/{score-frontend,speech-detect,research-scorer,squelch-derive}.js`
-  (the worker `importScripts` them). Confirm every path in `analyze-worker.js`'s `MODULES` list is copied.
-- `recorder/capture-handoff.js` is already covered (`cp src/recorder/*.js`).
-- **Refs:** `.github/workflows/deploy-pages.yml`; the module list is the `MODULES` array at the top of
-  `analyze-worker.js`.
+### D2. Complete the deploy allowlist — ✅ DONE (commit `6050f99`)
+`.github/workflows/deploy-pages.yml`:
+- Added `timeline.css` + `timeline-render.js` to the web `for f in …` loop.
+- The harness worker-module copy list is now **derived from `analyze-worker.js`'s `MODULES` array**
+  (`sed`/`grep`), so the allowlist can never drift out of sync with the worker; the deploy fails
+  loudly if a declared module is missing from source. All 22 modules verified to resolve.
+- Copies `harness/tags/registry.json` (fetched by `analyze.js`). `recorder/*.js` (incl.
+  `capture-handoff.js`) already covered.
 
-### D3. Triage the logged Minor review findings
-In `.superpowers/sdd/progress.md` (search "final-review triage"):
-1. `timeline-render.js` — wrapper `function` declarations at col 0 vs 2-space (cosmetic).
-2. `tests/browser-scope.test.js` — backfill an assertion for `fft.js`'s `self.SensoryNavScore.realFftDb`.
-3. `scripts/squelch-extract.js` — diagnostic-only `floorCheck` derivation changed (not in gated output).
+### D3. Triage the logged Minor review findings — ✅ DONE (commit pending)
+Dispositions recorded in `.superpowers/sdd/progress.md` ("D3 minor-findings triage — RESOLVED"):
+1. `timeline-render.js` col-0 wrapper indentation → **won't-fix** (intentional; verbatim-moved
+   byte-identical functions, reindenting is churn/risk).
+2. `tests/browser-scope.test.js` → **fixed** — backfilled `realFftDb` + the whole analyze-worker
+   MODULES surface (entry points `buildFrontEnd`/`scoreResearch`/`deriveSquelch`, etc.).
+3. `scripts/squelch-extract.js` → **fixed** — relabeled the misleading diagnostic to "first subbass
+   floor" (not the old derivation); gated output proven byte-identical.
 
 ## Pending — development
 

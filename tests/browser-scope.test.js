@@ -99,4 +99,31 @@ assert.strictEqual(typeof self.SensoryNavScore.loadRegistry, "function", "loadRe
 assert.ok(Array.isArray(self.SensoryNavScore.DOMAINS), "DOMAINS on self.SensoryNavScore");
 assert.ok(Array.isArray(self.SensoryNavScore.ACCEL), "ACCEL on self.SensoryNavScore");
 
+// On-device analyze worker surface: every module in analyze-worker.js's MODULES list must
+// publish its API onto self, or the worker throws at runtime in a browser (Node's per-require
+// scope hides this). We assert the whole chain here — especially the four ENTRY points the
+// worker calls as S.buildFrontEnd/detectSpeech/scoreResearch/deriveSquelch — so a module that
+// silently fails to attach is caught before deploy, not as a blank analyze page.
+require("../harness/audio/wav-decoder.js");
+require("../harness/score/metrics.js");
+require("../harness/score/baseline.js");
+require("../harness/score/spectral-chaos.js");
+require("../harness/score/score-frontend.js");
+require("../harness/score/research-scorer.js");
+require("../harness/score/squelch-derive.js");
+require("../recorder/constants.js");
+require("../recorder/audio-scoring.js");
+assert.strictEqual(typeof self.SensoryNavScore.realFftDb, "function", "realFftDb on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.decodeWav, "function", "decodeWav on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.quantile, "function", "quantile on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.fitBaseline, "function", "fitBaseline on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.computeSpectralChaos, "function", "computeSpectralChaos on self.SensoryNavScore");
+// The four entry points analyze-worker.js invokes directly.
+assert.strictEqual(typeof self.SensoryNavScore.buildFrontEnd, "function", "buildFrontEnd on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.scoreResearch, "function", "scoreResearch on self.SensoryNavScore");
+assert.strictEqual(typeof self.SensoryNavScore.deriveSquelch, "function", "deriveSquelch on self.SensoryNavScore");
+// Recorder-core modules the worker also loads; these attach to self.SensoryNavCore (not window).
+assert.ok(self.SensoryNavCore && typeof self.SensoryNavCore.CONSTANTS === "object", "CONSTANTS on self.SensoryNavCore");
+assert.strictEqual(typeof self.SensoryNavCore.roughnessScore, "function", "roughnessScore on self.SensoryNavCore");
+
 console.log("browser-scope tests passed");

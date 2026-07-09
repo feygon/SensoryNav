@@ -30,10 +30,11 @@ function main() {
   fs.writeFileSync(path.join(outDir, "squelch-clean.json"), JSON.stringify(sq));
   fs.writeFileSync(path.join(outDir, "tags-clean.json"), JSON.stringify(tagsOut));
 
+  // Diagnostic only (not part of gated output): first non-null sub-bass floor in the series.
   const floorCheck = sq.subbass_floor.find((f) => f != null);
   console.log(path.basename(sc), "->", outDir,
     "| subbass", sq.subbass.length, "low", sq.low.length, "mid", sq.mid.length, "high", sq.high.length, "pts",
-    "| events", tagsOut.events.length, "| subbass floor@sample0 speed:", (floorCheck != null ? floorCheck.toFixed(3) : "n/a"));
+    "| events", tagsOut.events.length, "| first subbass floor:", (floorCheck != null ? floorCheck.toFixed(3) : "n/a"));
 }
 
 main();
