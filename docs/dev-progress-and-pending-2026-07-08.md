@@ -72,10 +72,9 @@ Specced with decisions locked in **`docs/changelog-2026-07-09-ribbon-hover-and-c
 All three landed in `ribbon-render.js` and browser-verified on jc4:
 - **R1** ✅ — ribbon hover snaps to the base **event tick marks** (near-base-gated, within 9px) and
   surfaces the event's tags.
-- **R2** ✅ — **synchronized hover within the ribbon**: hovering any band draws the crosshair + dots on
-  all 4 bands and lists them in one tooltip. Per-renderer (does not cross into the timeline).
-  *Open follow-up:* extend the same per-panel sync to the timeline's ~5 sections (currently marks only
-  the hovered panel) — flagged for owner confirmation, not yet done.
+- **R2** ✅ — **synchronized hover within a panel**, both renderers: the ribbon syncs its 4 bands and
+  the timeline syncs its main/sub/low/mid-high sections (one shared crosshair x, dots on every panel,
+  aggregated tooltip). Per-renderer — the ribbon and timeline still do not drive each other.
 - **R3** ✅ — **chaos statistics** popover (median, binned-mode, peak, σ, n) per band + `total·weighted`
   (0.6/0.3/0.1 composite) and `total·pooled`, behind a ⓘ top-right of the ribbon.
 

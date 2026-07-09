@@ -27,10 +27,12 @@ cycle). Each item is self-contained; check off as landed. Touches the shared rib
     every band at the same snapped time and lists all four bands (level · chaos · tonality) in one
     tooltip, hovered band highlighted. Browser-verified on jc4 (crosshair spans all bands; tooltip
     lists sub-bass/low/mid/high; base-tick snap surfaces the event's tags). Commit: see git log.
-  - **Still open (timeline):** `timeline-render.js`'s `showHover` currently marks only the hovered
-    panel (main/sub/low/mh), gating events to near-base. Extending the same all-sections sync to the
-    timeline's ~5 sections is a separate follow-up — flagged for owner confirmation before doing it,
-    since the explicit complaint was the ribbon.
+  - **Done (timeline) — owner-approved 2026-07-09:** `timeline-render.js`'s `showHover` now works the
+    same way. The hovered panel picks the snapped time tS (event tick near the main/sub base, else a
+    band peak-snap, else nearest sample); every shown panel then draws its guide segment + dots at one
+    shared crosshair x, and the tooltip aggregates all sections (speed/roughness + composition, sub-bass,
+    low, mid/high). Browser-verified on jc4: single guide x across main/sub/low/mid-high, 11 dots
+    distributed across the four panels, aggregated tooltip. Event-at-base tag display preserved.
 
 - [x] **R3. Chaos statistics under an info icon (top-right of the spectral-chaos region).** Show
   per-band **and** total: **median, mode, peak (max), and standard deviation** of **spectral chaos**

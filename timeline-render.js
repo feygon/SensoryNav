@@ -605,6 +605,52 @@ function chartClient(D) {
     if (!n) n = 1;
     return { lo: lo / n, mi: mi / n, hi: hi / n, fl: fl / n, fm: fm / n, fh: fh / n };
   }
+  // R2 (timeline): every shown panel draws its marks at ONE shared crosshair x (xC) for the snapped
+  // time tS, so hovering any section marks them all. Each helper returns { marks, rows } — its SVG
+  // marks plus its tooltip fragment — and reads its own value at tS (drawn at xC for a straight line).
+  var GUIDE_C = "rgba(255,255,255,0.16)";
+  function drawMainAt(tS, xC) {
+    var pi = nearestPtIdx(tS), p = pts[pi], hr = D.hires, rv = roughField(p), units = roughMode === "db" ? " dB above floor" : " / 100";
+    var marks = segSvg(xC, mainTop, mainTop + mainH, GUIDE_C, 1) + dotSvg(xC, yS(p.speed), C_SPEED), rline;
+    if (envelopeOn) { // two lines drawn (faint raw + bold smoothed) — mark and report both
+      var sv = smoothedAt(pi);
+      marks += dotSvgSm(xC, yRough(rv), C_ROUGH) + dotSvg(xC, yRough(sv), C_ROUGH);
+      rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness smoothed <b>' + sv.toFixed(1)
+        + '</b> · raw ' + rv.toFixed(1) + units + ' (' + smoothW + 's avg)</div>';
+    } else {
+      marks += dotSvg(xC, yRough(rv), C_ROUGH);
+      rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness <b>' + rv.toFixed(1) + '</b>' + units + '</div>';
+    }
+    if (hr && hr.lo) { // composition: which bands sit above baseline right here (~1 s avg)
+      var av = bandAvg(p.t - 0.5, p.t + 0.5);
+      rline += '<div>' + dChip(C_LO, "low", av.lo - av.fl) + ' · ' + dChip(C_MI, "mid", av.mi - av.fm)
+        + ' · ' + dChip(C_HI, "high", av.hi - av.fh) + ' dB over base</div>';
+    }
+    return { marks: marks, rows: rline, speed: p.speed };
+  }
+  function drawSubAt(tS, xC) {
+    var sq = nearestSq(squelch.subbass, tS), floorS = sq.floor_db != null ? sq.floor_db : sq.level_db, ch = clamp(sq.chaos, 0, 1);
+    var marks = segSvg(xC, subTop, subTop + subH, GUIDE_C, 1) + segSvg(xC, yDbSub(sq.level_db), yDbSub(floorS), hueMix(ch), Math.max(0.6, ch * CHAOS_DISPLAY_DB))
+      + dotSvg(xC, yDbSub(floorS), C_SUBF) + dotSvg(xC, yDbSub(sq.level_db), hueMix(ch));
+    return { marks: marks, rows: ttSub(sq) };
+  }
+  function drawLowAt(tS, xC) {
+    var hr = D.hires, sL = bandStride(), i = Math.round(hiresIdx(tS) / sL) * sL, rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec;
+    var marks = segSvg(xC, lowTop, lowTop + lowH, GUIDE_C, 1) + segSvg(xC, yDbLow(rec), yDbLow(base), C_LO, 1.4)
+      + dotSvg(xC, yDbLow(base), C_LOF) + dotSvg(xC, yDbLow(rec), C_LO);
+    return { marks: marks, rows: ttRow(C_LO, "low", rec, base) };
+  }
+  function drawMHAt(tS, xC) {
+    var hr = D.hires, sM = bandStride(), j = Math.round(hiresIdx(tS) / sM) * sM;
+    var mr = hr.mi[j], mb = hr.floMi ? hr.floMi[j] : mr, hrr = hr.hi[j], hb = hr.floHi ? hr.floHi[j] : hrr;
+    var marks = segSvg(xC, mhTop, mhTop + mhH, GUIDE_C, 1)
+      + segSvg(xC, yDbMH(mr), yDbMH(mb), C_MI, 1.4) + dotSvg(xC, yDbMH(mb), C_MIF) + dotSvg(xC, yDbMH(mr), C_MI)
+      + segSvg(xC, yDbMH(hrr), yDbMH(hb), C_HI, 1.4) + dotSvg(xC, yDbMH(hb), C_HIF) + dotSvg(xC, yDbMH(hrr), C_HI);
+    return { marks: marks, rows: ttRow(C_MI, "mid", mr, mb) + ttRow(C_HI, "high", hrr, hb) };
+  }
+  function panelBottomOf(panel) {
+    return panel === "main" ? mainTop + mainH : panel === "sub" ? subTop + subH : panel === "low" ? lowTop + lowH : mhTop + mhH;
+  }
   function showHover(clientX, clientY) {
     if (drag && drag.moved) { hideHover(); return; }
     var s = svgEl(); if (!s) return;
@@ -618,69 +664,33 @@ function chartClient(D) {
     else if (lowMhShown() && sy >= mhTop && sy <= mhTop + mhH) panel = "mh";
     if (!panel) { hideHover(); return; }
 
-    var GUIDE = "rgba(255,255,255,0.16)", marks, html, panelBottom, xS;
-    if (panel === "main") {
-      var pb0 = mainTop + mainH;
-      var evMain = (sy >= pb0 - 9 && sy <= pb0 + 1) ? nearestEventNearX(sx) : null;
-      if (evMain) {
-        xS = xf(eventMidT(evMain));
-        marks = segSvg(xS, mainTop, pb0, GUIDE, 1) + dotSvg(xS, pb0 - 5, "#dcdcdc");
-        html = ttEvent(evMain);
-      } else {
-        var pi = nearestPtIdx(t), p = pts[pi]; xS = xf(p.t);
-        var rv = roughField(p), units = roughMode === "db" ? " dB above floor" : " / 100";
-        marks = segSvg(xS, mainTop, mainTop + mainH, GUIDE, 1) + dotSvg(xS, yS(p.speed), C_SPEED);
-        var rline;
-        if (envelopeOn) { // two lines drawn (faint raw + bold smoothed) — mark and report both
-          var sv = smoothedAt(pi);
-          marks += dotSvgSm(xS, yRough(rv), C_ROUGH) + dotSvg(xS, yRough(sv), C_ROUGH);
-          rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness smoothed <b>' + sv.toFixed(1)
-            + '</b> · raw ' + rv.toFixed(1) + units + ' (' + smoothW + 's avg)</div>';
-        } else {
-          marks += dotSvg(xS, yRough(rv), C_ROUGH);
-          rline = '<div><span class="ttsw" style="background:' + C_ROUGH + '"></span>roughness <b>' + rv.toFixed(1) + '</b>' + units + '</div>';
-        }
-        html = ttHead(p.t, p.speed) + rline;
-        if (hr && hr.lo) { // composition: which bands sit above baseline right here (~1 s avg)
-          var av = bandAvg(p.t - 0.5, p.t + 0.5);
-          html += '<div>' + dChip(C_LO, "low", av.lo - av.fl) + ' · ' + dChip(C_MI, "mid", av.mi - av.fm)
-            + ' · ' + dChip(C_HI, "high", av.hi - av.fh) + ' dB over base</div>';
-        }
-      }
-      panelBottom = pb0;
-    } else if (panel === "sub") {
-      var pbS = subTop + subH;
-      var evSub = (sy >= pbS - 9 && sy <= pbS + 1) ? nearestEventNearX(sx) : null;
-      if (evSub) {
-        xS = xf(eventMidT(evSub));
-        marks = segSvg(xS, subTop, pbS, GUIDE, 1) + dotSvg(xS, pbS - 5, "#dcdcdc");
-        html = ttEvent(evSub);
-      } else {
-        var sq = nearestSq(squelch.subbass, t); xS = xf(sq.t);
-        var floorS = sq.floor_db != null ? sq.floor_db : sq.level_db, ch = clamp(sq.chaos, 0, 1);
-        marks = segSvg(xS, subTop, pbS, GUIDE, 1) + segSvg(xS, yDbSub(sq.level_db), yDbSub(floorS), hueMix(ch), Math.max(0.6, ch * CHAOS_DISPLAY_DB))
-          + dotSvg(xS, yDbSub(floorS), C_SUBF) + dotSvg(xS, yDbSub(sq.level_db), hueMix(ch));
-        html = ttHead(sq.t, nearestPt(sq.t).speed) + ttSub(sq);
-      }
-      panelBottom = pbS;
-    } else if (panel === "low") {
-      var sL = bandStride(), i = peakSnap(Math.round(hiresIdx(t) / sL) * sL, sL, [{ arr: hr.lo, base: hr.floLo }]);
-      var tS = hr.t0 + i * hr.dt; xS = xf(tS);
-      var rec = hr.lo[i], base = hr.floLo ? hr.floLo[i] : rec, sp = nearestPt(tS).speed;
-      marks = segSvg(xS, lowTop, lowTop + lowH, GUIDE, 1) + segSvg(xS, yDbLow(rec), yDbLow(base), C_LO, 1.4)
-        + dotSvg(xS, yDbLow(base), C_LOF) + dotSvg(xS, yDbLow(rec), C_LO);
-      html = ttHead(tS, sp) + ttRow(C_LO, "low", rec, base);
-      panelBottom = lowTop + lowH;
+    // The HOVERED panel decides the snapped time tS: an event tick near its base, else a peak-snap in
+    // a band panel, else the nearest sample. Events snap only at the main/sub bases (where ticks live).
+    var ev = null;
+    if (panel === "main" && sy >= mainTop + mainH - 9 && sy <= mainTop + mainH + 1) ev = nearestEventNearX(sx);
+    else if (panel === "sub" && sy >= subTop + subH - 9 && sy <= subTop + subH + 1) ev = nearestEventNearX(sx);
+    var tS;
+    if (ev) tS = eventMidT(ev);
+    else if (panel === "low") { var sL = bandStride(); tS = hr.t0 + peakSnap(Math.round(hiresIdx(t) / sL) * sL, sL, [{ arr: hr.lo, base: hr.floLo }]) * hr.dt; }
+    else if (panel === "mh") { var sM = bandStride(); tS = hr.t0 + peakSnap(Math.round(hiresIdx(t) / sM) * sM, sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]) * hr.dt; }
+    else if (panel === "sub") tS = nearestSq(squelch.subbass, t).t;
+    else tS = nearestPt(t).t;
+    var xC = xf(tS);
+
+    // Draw marks on EVERY shown panel at xC; aggregate their tooltip rows (or show the event's tags).
+    var mMain = drawMainAt(tS, xC), marks = mMain.marks, mSub = null, mLow = null, mMH = null;
+    if (subShown()) { mSub = drawSubAt(tS, xC); marks += mSub.marks; }
+    if (lowMhShown()) { mLow = drawLowAt(tS, xC); mMH = drawMHAt(tS, xC); marks += mLow.marks + mMH.marks; }
+    var html;
+    if (ev) {
+      html = ttEvent(ev);
+      marks += dotSvg(xC, panelBottomOf(panel) - 5, "#dcdcdc"); // mark the event at the hovered base
     } else {
-      var sM = bandStride(), j = peakSnap(Math.round(hiresIdx(t) / sM) * sM, sM, [{ arr: hr.mi, base: hr.floMi }, { arr: hr.hi, base: hr.floHi }]);
-      var tS2 = hr.t0 + j * hr.dt; xS = xf(tS2);
-      var mr = hr.mi[j], mb = hr.floMi ? hr.floMi[j] : mr, hrr = hr.hi[j], hb = hr.floHi ? hr.floHi[j] : hrr, sp2 = nearestPt(tS2).speed;
-      marks = segSvg(xS, mhTop, mhTop + mhH, GUIDE, 1)
-        + segSvg(xS, yDbMH(mr), yDbMH(mb), C_MI, 1.4) + dotSvg(xS, yDbMH(mb), C_MIF) + dotSvg(xS, yDbMH(mr), C_MI)
-        + segSvg(xS, yDbMH(hrr), yDbMH(hb), C_HI, 1.4) + dotSvg(xS, yDbMH(hb), C_HIF) + dotSvg(xS, yDbMH(hrr), C_HI);
-      html = ttHead(tS2, sp2) + ttRow(C_MI, "mid", mr, mb) + ttRow(C_HI, "high", hrr, hb);
-      panelBottom = mhTop + mhH;
+      html = ttHead(tS, mMain.speed) + mMain.rows;
+      if (mSub) html += mSub.rows;
+      if (mLow) html += mLow.rows + mMH.rows;
     }
+    var panelBottom = panelBottomOf(panel), xS = xC;
     var g = s.querySelector("#hover");
     if (g) g.parentNode.removeChild(g);
     g = document.createElementNS("http://www.w3.org/2000/svg", "g");
