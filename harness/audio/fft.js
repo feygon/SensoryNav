@@ -1,4 +1,15 @@
 // harness/audio/fft.js
+// Real-input FFT -> per-bin dB spectrum, via an in-place radix-2 Cooley-Tukey core.
+// @unit-begin
+// unit:        fft
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    realFftDb(frame:Float32Array[FFT_SIZE]) -> Float32Array[FFT_SIZE/2] dB bins
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/fft.test.js
+// @unit-end
 "use strict";
 var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 

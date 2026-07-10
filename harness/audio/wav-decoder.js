@@ -1,4 +1,15 @@
 // harness/audio/wav-decoder.js
+// Decodes a mono 16-bit PCM WAV byte buffer into a Float32Array of samples in [-1,1].
+// @unit-begin
+// unit:        wav-decoder
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    decodeWav(bytes:Uint8Array|ArrayBuffer) -> {sampleRate,channels,bitDepth,sampleCount,samples}
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/wav-decoder.test.js
+// @unit-end
 "use strict";
 
 function readAscii(view, offset, length) {

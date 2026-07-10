@@ -1,4 +1,16 @@
 // harness/audio/load-pass.js
+// Batch driver: reads a pass's WAV + sidecar JSON from disk and turns them into SP1 windows.
+// @unit-begin
+// unit:        load-pass
+// causality:   acausal
+// state:       none
+// mutates:     io:fs
+// contract:    loadPass(wavPath,sidecarPath) -> {windows,sampleRate,warnings}
+//              windowsFromSamples(samples,sampleRate,audioFirstFrameMs) -> windows[]
+// deps:        audio/wav-decoder, audio/audio-windows
+// realtime:    batch-only
+// tested-by:   tests/load-pass.test.js
+// @unit-end
 "use strict";
 const fs = require("fs");
 const { decodeWav } = require("./wav-decoder");

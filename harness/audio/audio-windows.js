@@ -1,3 +1,18 @@
+// harness/audio/audio-windows.js
+// STFT over raw samples (per-frame band energies via fft.js), then groups frames into 1s
+// SP1 windows with per-window RMS/clip stats.
+// @unit-begin
+// unit:        audio-windows
+// causality:   causal
+// state:       none
+// mutates:     none
+// contract:    framesToWindows(samples,sampleRate,audioFirstFrameMs) -> windows[]
+//              stft(samples,sampleRate) -> frames[{centerSample,energies}]
+//              windowIndexFor(frameCenterSample,samplesPerWindow) -> number
+// deps:        audio/fft
+// realtime:    reuse-as-is
+// tested-by:   tests/audio-windows.test.js
+// @unit-end
 "use strict";
 var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 var { bandEnergiesFromSpectrum, averageWindowEnergies } = (typeof require !== "undefined") ? require("../../recorder/audio-scoring") : self.SensoryNavCore;
