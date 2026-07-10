@@ -237,6 +237,12 @@ is a separate future change, NOT part of this refactor — this carve changes no
 4. **Registry generator as a test** (§5) — wired into `npm test`; fails on undocumented units, dangling
    `tested-by`, contracts naming unexported functions, or `mutates: setting:*`.
 
+**CI-enforcement gap to close (Phase A).** The byte-identity tests (`research-scorer`, `squelch-derive`,
+`analyze-pipeline`) currently **skip in CI** — they read the uncommitted 58 MB pass + golden, so today the
+gate runs only on a dev machine. Phase A commits a **tiny fixture pass** (a short real ride + its
+regenerated mini-golden) so those tests **execute in CI**, turning the byte-identity safety net from
+local-only into CI-enforced for the whole refactor. (This is the follow-up flagged when CI was added.)
+
 All existing tests stay green; new per-core tests are added to the `npm test` chain.
 
 ## 9. Ordering (phases)
@@ -245,7 +251,8 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
 
 - **Phase A — standard & generator first.** Finalize the block format; write
   `scripts/generate-scorer-registry.js` + generate `docs/scorer-registry.md`; wire its validations into
-  `npm test`. (So every unit touched afterward is documented as we go.)
+  `npm test`. **Also commit a tiny fixture pass + regenerated mini-golden so the byte-identity tests run
+  (not skip) in CI** (§8). (So every unit touched afterward is documented and CI-guarded as we go.)
 - **Phase B — classify (zero-risk).** Add frontmatter blocks to every block-only module. No code change ⇒
   byte-identity holds trivially; the generator now passes with a fully-populated registry.
 - **Phase C — carve (gated), one target at a time**, in order: `kalman-smoother` → `score-frontend` →
@@ -279,6 +286,8 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
 5. The full `npm test` suite is green (existing 48 files + new per-core tests).
 6. `docs/scorer-registry.md` lets a reader answer, for any unit, "what does it do, how do I call it, what
    does it depend on, does it mutate anything, can I use it in realtime" without reading the source.
+7. The byte-identity tests **execute (not skip) in CI** against the committed tiny fixture — the safety
+   net is CI-enforced, not local-only.
 
 ## 12. Risks & open questions
 
