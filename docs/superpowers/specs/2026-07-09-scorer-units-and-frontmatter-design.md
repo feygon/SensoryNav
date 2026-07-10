@@ -100,7 +100,10 @@ non-deterministic`: hidden in-process state is the bad case; an explicit externa
 of the contract.
 
 **The portable ideal:** `causality: pure`, `state: none`, `mutates: none`. Anything else carries an
-explicit, reviewable reason.
+explicit, reviewable reason. **io belongs in the imperative shell, not the unit:** if a unit would emit
+(log, `postMessage`, write a file), prefer returning the value and letting the caller emit — keep the
+unit at `mutates: none`. (In this codebase the scorer units return values; `postMessage`/`console` live
+in `analyze-worker.js`, the shell.)
 
 **Load-time effect handled once:** every dual-export module runs `self.SensoryNavScore =
 Object.assign(…)` at import time. This uniform load-time registration (not a per-call effect) is noted

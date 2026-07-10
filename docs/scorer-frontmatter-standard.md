@@ -67,7 +67,9 @@ A delimited block in the unit's leading comment, AFTER a one-line prose descript
 | `tested-by` | test path(s) | the test(s) asserting the contract |
 
 **The portable ideal:** `causality: pure`, `state: none`, `mutates: none`. Anything else must carry an
-explicit, reviewable reason.
+explicit, reviewable reason. **io belongs in the imperative shell, not the unit:** if a unit would emit
+(log, `postMessage`, write a file), prefer returning the value and letting the caller emit — keep the unit
+at `mutates: none`.
 
 ## 4. Placement rule
 
