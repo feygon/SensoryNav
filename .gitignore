@@ -3,6 +3,8 @@
 !.env.example
 .playwright-mcp/
 out/
+!out/score-fixture/
 
 # Raw research audio captures — large, local dev/research only, never committed.
 data/*.wav
+!data/fixtures/
