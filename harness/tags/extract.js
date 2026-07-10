@@ -1,3 +1,17 @@
+// harness/tags/extract.js
+// Fusion loop: for each tag in the registry, reads its detection value + reliability off the
+// caller-supplied ctx (valueFor/reliabilityFor) and turns them into {value,confidence}.
+// @unit-begin
+// unit:        extract
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    extractTags(event,ctx{registry,valueFor,reliabilityFor}) -> {tags,accel_gaps}
+//              confidence(value,reliabilityFactor,accelDep) -> number[0,1]
+// deps:        tags/schema (registry shape), score/squelch-derive (ctx.valueFor/reliabilityFor producers)
+// realtime:    batch-only
+// tested-by:   tests/tags-extract.test.js
+// @unit-end
 "use strict";
 const ACCEL_CAP = { none: 1.0, disambiguates: 0.6, required: 0.4 };
 function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }

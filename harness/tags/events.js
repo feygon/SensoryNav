@@ -1,3 +1,20 @@
+// harness/tags/events.js
+// Detects sub-bass chaos events: a pass-wide 90th-percentile chaos threshold seeds/extends a
+// run wherever chaos exceeds it (and the point isn't near-silence), then merges close runs and
+// splits/filters by length. CARVE TARGET (Phase C): split into chaosThreshold(series) -> thr
+// (acausal), seedWindow(row,thr) -> bool (pure, preserves today's exact predicate), and
+// segmentEvents(rows,seedFn,opts) -> events[] (causal:carried). This block documents the
+// module's CURRENT (pre-carve) public contract.
+// @unit-begin
+// unit:        events
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    detectEvents(series,opts) -> events[{i_start,i_end,t_start,t_end}]
+// deps:        —
+// realtime:    needs-streaming-variant
+// tested-by:   tests/tags-events.test.js
+// @unit-end
 "use strict";
 function pct(arr, p) { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(p * (s.length - 1))] : 0; }
 function detectEvents(series, opts) {

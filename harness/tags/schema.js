@@ -1,3 +1,18 @@
+// harness/tags/schema.js
+// Tag registry record shape validator, plus a loader: pass an already-parsed registry object
+// through unchanged (the Worker path, which can't touch fs), or read+parse every *.json in a
+// directory (the Node batch-driver path).
+// @unit-begin
+// unit:        schema
+// causality:   compose
+// state:       none
+// mutates:     io:fs
+// contract:    validateTag(rec) -> {ok,errors}
+//              loadRegistry(dirOrObj) -> registry   // object: pass-through (pure); string: reads+parses dir/*.json (io:fs)
+// deps:        —
+// realtime:    batch-only
+// tested-by:   tests/tags-schema.test.js
+// @unit-end
 "use strict";
 var fs = (typeof require !== "undefined") ? require("fs") : null;
 var path = (typeof require !== "undefined") ? require("path") : null;
