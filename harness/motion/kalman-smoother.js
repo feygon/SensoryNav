@@ -1,8 +1,7 @@
 // harness/motion/kalman-smoother.js
 // Constant-velocity Kalman filter (forward pass) + RTS backward smoother over projected GPS
-// points, plus a point-in-time evaluator. CARVE TARGET (Phase C): a per-fix kalmanStep(state,fix)
-// -> {state,out} core will be added so a stream can fold it identically to today's forwardFilter
-// loop; this block documents the module's CURRENT (pre-carve) public contract.
+// points, plus a point-in-time evaluator. forwardFilter folds the pure per-fix kalmanStep(state,fix)
+// -> {state,out} core over points; a stream can fold kalmanStep identically outside a batch.
 // @unit-begin
 // unit:        kalman-smoother
 // causality:   compose
@@ -12,9 +11,11 @@
 //              evaluateAt(smoothed,t,sigmaA) -> {s,P}
 //              forwardFilter(points,sigmaA) -> filtered[{sFilt,PFilt,sPred,PPred}]
 //              rtsBackward(points,filtered) -> smoothed[{t,s,P}]
+//              kalmanStep(state,fix,sigmaA) -> {state,out} — pure per-fix predict+update core
+//              (causal/carried core of forwardFilter; mutates:none, fresh state each call)
 // deps:        motion/linalg
 // realtime:    needs-streaming-variant
-// tested-by:   tests/kalman-smoother.test.js
+// tested-by:   tests/kalman-smoother.test.js, tests/kalman-step.test.js
 // @unit-end
 "use strict";
 var { matMul, transpose, matAdd, matSub, identity } = (typeof require !== "undefined") ? require("./linalg") : self.SensoryNavScore;
@@ -47,39 +48,53 @@ function invert2x2(M) {
 function colToVec(col) { return [col[0][0], col[1][0], col[2][0], col[3][0]]; }
 function vecToCol(v) { return [[v[0]], [v[1]], [v[2]], [v[3]]]; }
 
-// Forward Kalman filter. Returns per-fix { sFilt, PFilt, sPred, PPred }.
-function forwardFilter(points, sigmaA) {
+// Pure per-fix predict+update core. `state` carries { s, P, t } (filtered estimate, covariance,
+// and the fix time it was estimated at) or is null for the first fix in a sequence. Returns a
+// FRESH { state, out } — never mutates `state` or `fix`. `out` is the same per-fix record
+// forwardFilter has always produced: { sFilt, PFilt, sPred, PPred }.
+function kalmanStep(state, fix, sigmaA) {
+  if (state == null) {
+    const s = [[fix.x], [fix.y], [0], [0]];
+    const P = [
+      [fix.acc * fix.acc, 0, 0, 0],
+      [0, fix.acc * fix.acc, 0, 0],
+      [0, 0, INIT_VEL_VAR, 0],
+      [0, 0, 0, INIT_VEL_VAR]
+    ];
+    const out = { sFilt: s, PFilt: P, sPred: s, PPred: P };
+    return { state: { s, P, t: fix.t }, out };
+  }
+
   const q = sigmaA * sigmaA;
   const H = [[1, 0, 0, 0], [0, 1, 0, 0]];
   const Ht = transpose(H);
   const I4 = identity(4);
+
+  const dt = (fix.t - state.t) / 1000;
+  const F = buildF(dt);
+  const Q = buildQ(dt, q);
+  const sPred = matMul(F, state.s);
+  const PPred = matAdd(matMul(matMul(F, state.P), transpose(F)), Q);
+  const z = [[fix.x], [fix.y]];
+  const R = [[fix.acc * fix.acc, 0], [0, fix.acc * fix.acc]];
+  const S = matAdd(matMul(matMul(H, PPred), Ht), R);
+  const K = matMul(matMul(PPred, Ht), invert2x2(S)); // 4x2
+  const innov = matSub(z, matMul(H, sPred));
+  const sFilt = matAdd(sPred, matMul(K, innov));
+  const PFilt = matMul(matSub(I4, matMul(K, H)), PPred);
+
+  const out = { sFilt, PFilt, sPred, PPred };
+  return { state: { s: sFilt, P: PFilt, t: fix.t }, out };
+}
+
+// Forward Kalman filter. Returns per-fix { sFilt, PFilt, sPred, PPred }, by folding kalmanStep.
+function forwardFilter(points, sigmaA) {
   const out = [];
-
-  const p0 = points[0];
-  let s = [[p0.x], [p0.y], [0], [0]];
-  let P = [
-    [p0.acc * p0.acc, 0, 0, 0],
-    [0, p0.acc * p0.acc, 0, 0],
-    [0, 0, INIT_VEL_VAR, 0],
-    [0, 0, 0, INIT_VEL_VAR]
-  ];
-  out.push({ sFilt: s, PFilt: P, sPred: s, PPred: P });
-
-  for (let k = 1; k < points.length; k++) {
-    const pk = points[k];
-    const dt = (pk.t - points[k - 1].t) / 1000;
-    const F = buildF(dt);
-    const Q = buildQ(dt, q);
-    const sPred = matMul(F, s);
-    const PPred = matAdd(matMul(matMul(F, P), transpose(F)), Q);
-    const z = [[pk.x], [pk.y]];
-    const R = [[pk.acc * pk.acc, 0], [0, pk.acc * pk.acc]];
-    const S = matAdd(matMul(matMul(H, PPred), Ht), R);
-    const K = matMul(matMul(PPred, Ht), invert2x2(S)); // 4x2
-    const innov = matSub(z, matMul(H, sPred));
-    s = matAdd(sPred, matMul(K, innov));
-    P = matMul(matSub(I4, matMul(K, H)), PPred);
-    out.push({ sFilt: s, PFilt: P, sPred, PPred });
+  let state = null;
+  for (let k = 0; k < points.length; k++) {
+    const r = kalmanStep(state, points[k], sigmaA);
+    state = r.state;
+    out.push(r.out);
   }
   return out;
 }
@@ -132,7 +147,7 @@ function evaluateAt(smoothed, t, sigmaA) {
 
 // Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
 {
-  const exported = { smooth, evaluateAt, forwardFilter, rtsBackward, INIT_VEL_VAR };
+  const exported = { smooth, evaluateAt, forwardFilter, rtsBackward, kalmanStep, INIT_VEL_VAR };
   if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
   if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
 }
