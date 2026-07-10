@@ -4,9 +4,8 @@
 // Both scripts/score-research.js and scripts/squelch-extract.js compute this identical
 // prelude today; this module lifts it so it is computed once per capture and reused by
 // both the Node scorer scripts and the on-device Worker (dual Node/self import guard below).
-// CARVE TARGET (Phase C): split into a causal windowing+STFT front-end and the acausal motion
-// smoothing it currently wires in sequence, so the per-window front-end is reusable on its own.
-// This block documents the module's CURRENT (pre-carve) public contract.
+// The causal windowing+STFT front-end (buildWindows) is carved out from the acausal motion
+// smoothing, so the per-window front-end is reusable on its own.
 // @unit-begin
 // unit:        score-frontend
 // causality:   compose
