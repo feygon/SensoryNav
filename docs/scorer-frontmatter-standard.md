@@ -102,7 +102,9 @@ registration (not a per-call effect) is noted ONCE in the generated registry's p
 
 ## 7. Validation rules (rubric seed)
 
-The generator (and the future rubric) fails / flags when:
+Rules 1–5 and 7 are **mechanical generator checks** (six total, wired into `npm test`). Rule 6 is a
+**design-review guideline** — reference-vs-data coordination isn't statically detectable, so it's checked
+at review, not by the generator. The generator (and the future rubric) fails / flags when:
 
 1. a scorer module has no `@unit-begin` block (every unit must be documented);
 2. a `tested-by` path does not exist;
@@ -110,8 +112,8 @@ The generator (and the future rubric) fails / flags when:
 4. any `mutates: setting:*` appears (a unit rewriting shared config is the "silent divergence between
    call sites" defect);
 5. a required field is missing, or a field value is outside its allowed set;
-6. a `compose`/fusion unit's inputs are not an explicit joined row / parameters (coordinates by reference
-   instead of by data — §5);
+6. **(review guideline, not mechanical)** a `compose`/fusion unit's inputs are not an explicit joined row /
+   parameter bundle (coordinates by reference instead of by data — §5);
 7. a unit claims `causality: pure` / `state: none` but the `mutates` field is not `none` (contradiction).
 
 ## 8. Causality + mutation quick reference

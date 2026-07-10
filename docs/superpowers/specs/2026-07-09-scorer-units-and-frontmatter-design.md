@@ -155,7 +155,13 @@ the same change that touches a unit.
 2. a `tested-by` path does not exist;
 3. a `contract` names a function the module does not export;
 4. any `mutates: setting:*` appears (defect);
-5. a required field is missing or a field value is outside its allowed set.
+5. a required field is missing or a field value is outside its allowed set;
+6. a unit declares `causality: pure` + `state: none` but `mutates` is not `none` (a self-contradiction —
+   a mislabeled "pure" unit).
+
+These are the **six mechanical checks**. The standard doc's remaining rule — fusion units must coordinate
+on a joined row / explicit params, not references (§7) — is a **design-review guideline**, NOT generator-
+enforced, because reference-vs-data coordination isn't statically detectable; it's checked at review.
 
 This keeps the frontmatter from rotting and enforces the "every unit is tested and honestly labelled"
 invariant mechanically.
@@ -240,6 +246,14 @@ into an **explicit context** so each becomes a pure `(name, event, ctx)`:
 - `reliabilityFor(name, event, ctx) -> number` — `0` if any event window is `low_conf`, else
   `ctx.window.reliability`.
 
+Two clarifications on `ctx`: (a) it is a **parameter bundle, not the 8-field `joinWindows` row** — these
+fusions need the raw sub-bass/low/mid/high *series* to time-align the ratio, which the join row
+deliberately doesn't carry; passing `floorAt` as a pure lookup *function* is an accepted exception to
+"data, not references" (§7's rule targets hidden cross-unit references, not an explicit pure lookup).
+(b) `ctx.bands`/`bandN`/`floorAt` are **per-pass**, but `ctx.window` is **per-event** — the shell resolves
+the nearest scored window for each event (as today's `extractTags` loop does) and threads it in; do not
+build one static `ctx` for the whole pass.
+
 This is a **signature change** (de-closuring), not just relocation: §10's "no math change" holds
 numerically, but the interface surgery is real, so both get a per-carve equivalence test (§8.3) asserting
 the de-closured functions reproduce the closures' output on the jc4 fixture.
@@ -304,8 +318,7 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
 
 1. Every `harness/**` scorer module carries a valid `@unit-begin` frontmatter block; the generator passes
    with zero violations and `docs/scorer-registry.md` lists all units grouped by causality.
-2. The generator's four validations (undocumented unit, dangling `tested-by`, unexported contract fn,
-   `mutates: setting:*`) run in `npm test` and fail the build when violated — proven once during Phase A
+2. The generator's six mechanical checks (§5) run in `npm test` and fail the build when violated — proven once during Phase A
    by a **throwaway** negative check (introduce a violation, confirm `npm test` goes red, then revert; the
    violation is NOT committed).
 3. The 5 carve targets each expose their reusable core as an independently importable, `mutates: none`,
