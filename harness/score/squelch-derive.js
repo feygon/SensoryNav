@@ -7,6 +7,20 @@
 // tags-clean.json. Extracted verbatim from scripts/squelch-extract.js (Task 9) so the
 // derivation is reusable from a Worker; the script itself is now a thin I/O wrapper around
 // deriveSquelch().
+// CARVE TARGET (Phase C): split into joinWindows(chaosSeries,scoredWindows,floors) -> rows[], and
+// de-closure makeValueFor/makeReliabilityFor into pure valueFor(name,event,ctx) /
+// reliabilityFor(name,event,ctx) fusions. This block documents the module's CURRENT (pre-carve)
+// public contract.
+// @unit-begin
+// unit:        squelch-derive
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    deriveSquelch(front,samples,sr,opts{registry}) -> {squelch,tags{events[]}}
+// deps:        score/spectral-chaos, score/baseline, score/reliability, tags/events, tags/extract
+// realtime:    needs-streaming-variant
+// tested-by:   tests/squelch-derive.test.js
+// @unit-end
 "use strict";
 var D = (typeof require !== "undefined") ? {
   computeSpectralChaos: require("./spectral-chaos").computeSpectralChaos,

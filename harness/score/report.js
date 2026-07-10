@@ -1,4 +1,20 @@
 // harness/score/report.js
+// Pure formatters for a scored pass: JSON/CSV serialization + a self-contained dark-mode
+// inspection HTML page. No file IO of its own — the caller (run-scorer.js) writes the returned
+// strings to disk.
+// @unit-begin
+// unit:        report
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    scoredWindowsJson(scored) -> string
+//              sessionSummaryJson(summary) -> string
+//              scoredWindowsCsv(scored) -> string
+//              inspectionHtml(scored,summary) -> string
+// deps:        —
+// realtime:    batch-only
+// tested-by:   tests/score-report.test.js
+// @unit-end
 "use strict";
 
 const COLS = ["window_id", "started_at_ms", "lat", "lon", "speed_mps", "heading_deg",

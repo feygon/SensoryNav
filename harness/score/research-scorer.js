@@ -7,6 +7,19 @@
 // trace object that scripts/score-research.js writes to scored-clean.json / highres-clean.json.
 // Extracted verbatim from scripts/score-research.js (Task 8) so the derivation is reusable from
 // a Worker; the script itself is now a thin I/O wrapper around scoreResearch().
+// CARVE TARGET (Phase C): split into acausal prep (baseline fit, speech ranges) and a pure
+// scoreWindow(window,floors,weights) -> row core the batch loop AND a future realtime path can
+// call identically. This block documents the module's CURRENT (pre-carve) public contract.
+// @unit-begin
+// unit:        research-scorer
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    scoreResearch(front,opts) -> {scored[],hires,baseline_meta}
+// deps:        score/baseline, score/reliability, score/roughness-db, score/score-frontend (front is its output)
+// realtime:    needs-streaming-variant
+// tested-by:   tests/research-scorer.test.js
+// @unit-end
 "use strict";
 var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 var D = (typeof require !== "undefined") ? {

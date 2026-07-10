@@ -2,6 +2,18 @@
 "use strict";
 var { rocAuc, precisionRecall, bestF1Threshold, weightedSpearman } = (typeof require !== "undefined") ? require("./metrics") : self.SensoryNavScore;
 
+// @unit-begin
+// unit:        validate
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    validatePass(scored,params) -> summary{n_total,n_excluded,presence,magnitude}
+//              validateBatch(perPassScored,params) -> {per_pass[],aggregate}
+// deps:        score/metrics
+// realtime:    batch-only
+// tested-by:   tests/score-validate.test.js
+// @unit-end
+
 const DEFAULTS = { DETECT_TAU: 12, MIN_SPEARMAN_N: 5 };
 
 function buildSummary(scored, p) {

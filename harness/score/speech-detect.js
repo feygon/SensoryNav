@@ -3,6 +3,16 @@
 // worker and the (thin) research scorer share ONE detector. Feeds BOTH the baseline
 // talking-exclusion (windows where isTalking(i) is true are dropped from the speed-conditioned
 // baseline fit) and the pink speech ribbon (speechRanges -> highres-clean.json's `speech`).
+// @unit-begin
+// unit:        speech-detect
+// causality:   causal
+// state:       none
+// mutates:     none
+// contract:    detectSpeech(frames,sr) -> {speechCount,isTalking(i)->bool,speechRanges}
+// deps:        score/roughness-db
+// realtime:    reuse-as-is
+// tested-by:   tests/speech-detect.test.js
+// @unit-end
 "use strict";
 var { toDb } = (typeof require !== "undefined") ? require("./roughness-db") : self.SensoryNavScore;
 
