@@ -17,8 +17,11 @@ const { detectSpeech } = require("../harness/score/speech-detect.js");
 const { scoreResearch } = require("../harness/score/research-scorer.js");
 const { deriveSquelch } = require("../harness/score/squelch-derive.js");
 const { loadRegistry } = require("../harness/tags/schema.js");
+const { have, skipped } = require("./lib/fixtures");
 
 const sc = "data/johnson-creek-pass-4-181806.json";
+const goldenDir = path.join("out", "score-jc4");
+if (!have(sc, "data/johnson-creek-pass-4-181806.wav", path.join(goldenDir, "scored-clean.json"), path.join(goldenDir, "tags-clean.json"))) { skipped("analyze-pipeline.test.js", sc + " / out/score-jc4"); process.exit(0); }
 const sidecar = JSON.parse(fs.readFileSync(sc, "utf8"));
 const wavBytes = fs.readFileSync(path.join(path.dirname(sc), sidecar.audio.wav_filename));
 

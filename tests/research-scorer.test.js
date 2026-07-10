@@ -10,8 +10,11 @@ const path = require("path");
 const { buildFrontEnd } = require("../harness/score/score-frontend.js");
 const { detectSpeech } = require("../harness/score/speech-detect.js");
 const { scoreResearch } = require("../harness/score/research-scorer.js");
+const { have, skipped } = require("./lib/fixtures");
 
 const sc = "data/johnson-creek-pass-4-181806.json";
+const ref8 = path.join(".superpowers", "sdd", "task8-ref");
+if (!have(sc, "data/johnson-creek-pass-4-181806.wav", path.join(ref8, "scored-clean.json"), path.join(ref8, "highres-clean.json"))) { skipped("research-scorer.test.js", sc + " / task8-ref"); process.exit(0); }
 const sidecar = JSON.parse(fs.readFileSync(sc, "utf8"));
 const wavBytes = fs.readFileSync(path.join(path.dirname(sc), sidecar.audio.wav_filename));
 const front = buildFrontEnd({ wavBytes, audioFirstFrameMs: sidecar.audio_first_frame_ms, gpsSamples: sidecar.gps_samples });

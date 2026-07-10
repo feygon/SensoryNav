@@ -4,7 +4,9 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { buildFrontEnd } = require("../harness/score/score-frontend.js");
+const { have, skipped } = require("./lib/fixtures");
 const sc = "data/johnson-creek-pass-4-181806.json";
+if (!have(sc, "data/johnson-creek-pass-4-181806.wav")) { skipped("score-frontend.test.js", sc); process.exit(0); }
 const sidecar = JSON.parse(fs.readFileSync(sc, "utf8"));
 const wavBytes = fs.readFileSync(path.join(path.dirname(sc), sidecar.audio.wav_filename));
 const f = buildFrontEnd({ wavBytes, audioFirstFrameMs: sidecar.audio_first_frame_ms, gpsSamples: sidecar.gps_samples });

@@ -10,8 +10,11 @@ const path = require("path");
 const { buildFrontEnd } = require("../harness/score/score-frontend.js");
 const { deriveSquelch } = require("../harness/score/squelch-derive.js");
 const { loadRegistry } = require("../harness/tags/schema.js");
+const { have, skipped } = require("./lib/fixtures");
 
 const sc = "data/johnson-creek-pass-4-181806.json";
+const ref9 = path.join(".superpowers", "sdd", "task9-ref");
+if (!have(sc, "data/johnson-creek-pass-4-181806.wav", path.join(ref9, "squelch-clean.json"), path.join(ref9, "tags-clean.json"))) { skipped("squelch-derive.test.js", sc + " / task9-ref"); process.exit(0); }
 const sidecar = JSON.parse(fs.readFileSync(sc, "utf8"));
 const wavBytes = fs.readFileSync(path.join(path.dirname(sc), sidecar.audio.wav_filename));
 const front = buildFrontEnd({ wavBytes, audioFirstFrameMs: sidecar.audio_first_frame_ms, gpsSamples: sidecar.gps_samples });
