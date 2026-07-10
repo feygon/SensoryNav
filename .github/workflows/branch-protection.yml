@@ -1,0 +1,59 @@
+name: Apply branch protection
+
+# Enshrines main's branch-protection rule AS CODE. The desired state lives in
+# .github/branch-protection/main.json (reviewable, version-controlled); this workflow applies it via
+# the GitHub API so the setting can't silently drift in the UI — re-run to reconcile. Runs manually
+# (workflow_dispatch) or when the config file changes on main. Zero marketplace actions (pure git +
+# the built-in gh CLI).
+#
+# This is the ONLY workflow that requests `administration: write` (needed to manage protection). It
+# holds no other scope and touches nothing but the protection endpoint. If the built-in GITHUB_TOKEN
+# is ever disallowed from editing protection (org policy), the first run fails 403 and a narrowly
+# scoped PAT would be required instead (a secret — weigh that tradeoff before adding one).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/branch-protection/main.json"
+      - ".github/workflows/branch-protection.yml"
+
+permissions:
+  contents: read # read the config out of the repo
+  administration: write # least privilege: only the branch-protection endpoints
+
+concurrency:
+  group: branch-protection
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch the config (no marketplace action)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir src && cd src
+          git init --quiet
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch --quiet --depth 1 origin "$SHA"
+          git checkout --quiet FETCH_HEAD
+
+      - name: Apply protection to main from the committed config
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        working-directory: src
+        run: |
+          set -euo pipefail
+          gh api --method PUT "repos/${REPO}/branches/main/protection" \
+            -H "Accept: application/vnd.github+json" \
+            --input .github/branch-protection/main.json
+          echo "applied — current protection on main:"
+          gh api "repos/${REPO}/branches/main/protection" \
+            --jq '{required_checks: .required_status_checks.contexts, strict: .required_status_checks.strict, enforce_admins: .enforce_admins.enabled}'
