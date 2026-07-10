@@ -1,4 +1,18 @@
 // harness/motion/motion-track.js
+// SP2 motion track: projects + RTS-smooths GPS fixes (kalman-smoother), then classifies each
+// SP1 window's speed/heading/confidence/source against the smoothed track and Doppler.
+// @unit-begin
+// unit:        motion-track
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    buildMotionTrack(gpsSamples,windows,params) -> track[{window_id,lat,lon,speed_mps,heading_deg,speed_confidence,speed_source,flags}]
+//              classifyWindow(t,startedAtMs,speed,vEast,vNorth,velTraceVar,fixes,params) -> {confidence,source,flags,heading}
+//              confidenceFromCov(velTraceVar,params) -> number
+// deps:        motion/geo-project, motion/kalman-smoother
+// realtime:    batch-only
+// tested-by:   tests/motion-track.test.js, tests/motion-track-latlon.test.js
+// @unit-end
 "use strict";
 var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
 var { projectFixes, bearingDeg, R_EARTH } = (typeof require !== "undefined") ? require("./geo-project") : self.SensoryNavScore;

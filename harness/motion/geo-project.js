@@ -1,4 +1,17 @@
 // harness/motion/geo-project.js
+// Local flat-earth equirectangular projection of GPS fixes around their own mean, plus a
+// bearing-from-velocity helper.
+// @unit-begin
+// unit:        geo-project
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    projectFixes(gpsSamples) -> {points,lat0,lon0}
+//              bearingDeg(vEast,vNorth) -> number
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/geo-project.test.js
+// @unit-end
 "use strict";
 
 const R_EARTH = 6371000;

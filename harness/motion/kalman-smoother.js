@@ -1,4 +1,21 @@
 // harness/motion/kalman-smoother.js
+// Constant-velocity Kalman filter (forward pass) + RTS backward smoother over projected GPS
+// points, plus a point-in-time evaluator. CARVE TARGET (Phase C): a per-fix kalmanStep(state,fix)
+// -> {state,out} core will be added so a stream can fold it identically to today's forwardFilter
+// loop; this block documents the module's CURRENT (pre-carve) public contract.
+// @unit-begin
+// unit:        kalman-smoother
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    smooth(points,sigmaA) -> smoothed[{t,s,P}]
+//              evaluateAt(smoothed,t,sigmaA) -> {s,P}
+//              forwardFilter(points,sigmaA) -> filtered[{sFilt,PFilt,sPred,PPred}]
+//              rtsBackward(points,filtered) -> smoothed[{t,s,P}]
+// deps:        motion/linalg
+// realtime:    needs-streaming-variant
+// tested-by:   tests/kalman-smoother.test.js
+// @unit-end
 "use strict";
 var { matMul, transpose, matAdd, matSub, identity } = (typeof require !== "undefined") ? require("./linalg") : self.SensoryNavScore;
 var { solve } = (typeof require !== "undefined") ? require("./linalg") : self.SensoryNavScore;
