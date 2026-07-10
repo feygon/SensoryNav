@@ -60,7 +60,7 @@ A delimited block in the unit's leading comment, AFTER a one-line prose descript
 | `unit` | kebab-case name | the unit's short name (usually the filename stem) |
 | `causality` | `pure` \| `causal` \| `acausal` \| `compose` | see §8 |
 | `state` | `none` \| `carried:<shape>` | carried state is threaded through the contract and returned fresh (batch folds it; realtime calls per-sample) |
-| `mutates` | `none` \| `input:<n>` \| `setting:<n>` \| `data:<n>` \| `io:<sink>` | what the unit mutates; `setting:*` is a defect (see §7). `io` sinks: `fs` \| `dom` \| `postMessage` \| `console` \| `network` |
+| `mutates` | `none` \| `input:<n>` \| `setting:<n>` \| `data:<n>` \| `io:<sink>` | what the unit mutates; `setting:*` is a defect (see §7). `data:` = IN-PROCESS module/global state only; external persistence is `io:` (`io:db` for a datastore write, not `data:`). `io` sinks: `fs` \| `dom` \| `postMessage` \| `console` \| `network` \| `db`/`store` |
 | `contract` | signature line(s) | public entry point(s): name, argument shapes, return shape + invariants. This is the test/reuse spec. Multi-line allowed (a `compose` unit lists its batch entry AND any carved core it exposes) |
 | `deps` | unit names or `—` | units whose output this one consumes, by code import OR by receiving their output as data |
 | `realtime` | `reuse-as-is` \| `needs-streaming-variant` \| `batch-only` | where the unit can run |
@@ -128,13 +128,20 @@ cores.
 - `input:<n>` — mutates a passed-in argument in place (legit DSP pattern; MUST be declared so callers
   don't alias).
 - `setting:<n>` — mutates config/constants; should NEVER appear (defect).
-- `data:<n>` — mutates module-level/global/external state; breaks determinism-across-calls, blocks
-  streaming reuse.
-- `io:<sink>` — external effect (`fs` \| `dom` \| `postMessage` \| `console` \| `network`).
+- `data:<n>` — mutates IN-PROCESS module/global state (a cache, a shared accumulator); breaks
+  determinism-across-calls and blocks streaming reuse when the state is hidden. In-process only.
+- `io:<sink>` — external effect (`fs` \| `dom` \| `postMessage` \| `console` \| `network` \| `db`/`store`).
+  A datastore write is `io:db`, NOT `data:`; with the store as an explicit dependency it is deterministic
+  (a transform of `(inputs, state) → new state`) — just not pure.
 
 `state` + `mutates` together fully describe behavior: `state: carried:{s,P}` + `mutates: none` is the
 clean functional-update pattern; `state: carried` + `mutates: input:state` is the hazardous in-place
 variant, declared so nobody aliases it.
+
+**Scope note:** this taxonomy targets a COMPUTE pipeline whose units aspire to purity, so an effect is a
+hazard to minimize toward `mutates: none`. A command/repository layer whose PURPOSE is to persist
+(a business-rule DB write) is legitimately effectful and wants its own vocabulary (commands/queries,
+repositories, the datastore as an explicit dependency) — `not pure ≠ non-deterministic`.
 
 ## 9. Turning this into a skill + rubric
 

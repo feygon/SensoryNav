@@ -81,13 +81,23 @@ and realtime calls per-sample — same function.
   performance pattern, but MUST be declared so callers do not alias.
 - `setting:<name>` — mutates config/constants. Should NEVER appear; the generator flags it as a defect
   (a unit rewriting shared config is the "silent divergence between call sites" failure mode).
-- `data:<name>` — mutates module-level/global/external state. Breaks determinism-across-calls and blocks
-  streaming reuse; flagged in the registry.
-- `io:<sink>` — external effect: `fs` | `dom` | `postMessage` | `console` | `network`.
+- `data:<name>` — mutates IN-PROCESS module-level/global state (a cache, a shared accumulator). Breaks
+  determinism-across-calls and blocks streaming reuse specifically when the state is HIDDEN/implicit;
+  flagged in the registry. (In-process only — external persistence is `io:`, below.)
+- `io:<sink>` — external effect: `fs` | `dom` | `postMessage` | `console` | `network` | `db`/`store`. An
+  external datastore write is `io:db`, NOT `data:`; and when the store is an EXPLICIT dependency, the
+  write is deterministic (a transform of `(inputs, current state) → new state`) — just not pure.
 
 `state` and `mutates` together fully describe behavior: `state: carried:{s,P}` + `mutates: none` is the
 clean functional-update pattern (caller owns the returned state); `state: carried` + `mutates:
 input:state` is the hazardous in-place variant, declared so nobody aliases it.
+
+**Scope of this taxonomy:** it targets a COMPUTE pipeline whose units aspire to purity, so an effect is a
+hazard to flag and drive toward `mutates: none`. A command/repository layer whose PURPOSE is to persist
+(a business-rule DB write) is legitimately effectful — it wants its own vocabulary (commands/queries,
+repositories, the datastore as an explicit dependency), not "flagged as a defect." `not pure ≠
+non-deterministic`: hidden in-process state is the bad case; an explicit external store is a declared part
+of the contract.
 
 **The portable ideal:** `causality: pure`, `state: none`, `mutates: none`. Anything else carries an
 explicit, reviewable reason.
