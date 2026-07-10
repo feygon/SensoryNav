@@ -176,6 +176,7 @@ Most modules just get a **block** (already single-responsibility); only `compose
 | `validate`, `felt`, `report`, `run-scorer`, `score-pass`, `roughness`, `load-pass` | `acausal` / batch tooling | `realtime: batch-only`, no carve |
 | `speech-detect` | per-window flag `causal`; range merge `causal` | exclusion is applied by the scorer, not here |
 | `motion-track` | `buildMotionTrack`=`compose`/`acausal` (uses RTS); `classifyWindow`/`confidenceFromCov`=`pure` | classify; core carve lives in `kalman-smoother` |
+| `tags/extract` | `extractTags`=`compose` (loops the registry, calls `valueFor`/`reliabilityFor`/`confidence`); `confidence(value,reliabilityFactor,accelDep)`=`pure` core; `ACCEL_CAP`=`pure` const | block-only — `extractTags` is already a thin fusion loop; the tag-value math it calls (`valueFor`/`reliabilityFor`) is the carve in `squelch-derive`, below |
 
 **Carve — split a reusable core out (5 targets):**
 
@@ -184,19 +185,21 @@ Most modules just get a **block** (already single-responsibility); only `compose
 | `kalman-smoother` | keep `forwardFilter`(causal)/`rtsBackward`(acausal)/`smooth`(compose); ADD a per-fix `kalmanStep(state,fix) -> {state,out}` `pure`/`carried:none-mutate` core so a stream folds it |
 | `score-frontend` | `causal` windowing+STFT front-end **·** `acausal` motion smoothing, separated so the per-window front-end is reusable |
 | `research-scorer` | `acausal` prep (baseline fit, speech ranges) **·** `scoreWindow(window,floors,weights) -> row` `pure` core (batch loop AND realtime call it identically) |
-| `squelch-derive` | `joinWindows(chaosSeries, scoredWindows, floors) -> rows` **·** `valueFor(tag,event,rows)` `pure` fusion **·** the event carve below |
+| `squelch-derive` | `joinWindows(chaosSeries, scoredWindows, floors) -> rows` **·** **de-closure** the two tag-value closures into pure fusions (a SIGNATURE change, not just relocation — see §7): `makeValueFor(sq,baseline,eventCtx)→valueFor(name,event)` ⇒ `valueFor(name, event, ctx) -> number\|null`; `makeReliabilityFor(sq,eventCtx)→reliabilityFor(name,event)` ⇒ `reliabilityFor(name, event, ctx) -> number` |
 | `tags/events` (`detectEvents`) | `chaosThreshold(series) -> thr` `acausal` **·** `seedWindow(row,thr) -> bool` `pure` (preserves the CURRENT predicate `chaos>thr ∧ !low_conf`) **·** `segmentEvents(rows,seedFn,opts) -> events[]` `causal:carried` |
 
 **Net-new reusable cores for the future realtime path:** `kalmanStep`, the causal front-end,
-`scoreWindow`, `joinWindows`, `valueFor`, `seedWindow`, `segmentEvents`. Each is `pure` or `causal` with
-`mutates: none`; the realtime engine imports these and supplies its own rolling `baseline` /
-`chaosThreshold`.
+`scoreWindow`, `joinWindows`, `valueFor`, `reliabilityFor`, `seedWindow`, `segmentEvents` (8). Each is
+`pure` or `causal` with `mutates: none`; the realtime engine imports these and supplies its own rolling
+`baseline` / `chaosThreshold`.
 
 ## 7. Coordination / fusion units
 
 Some units combine the OUTPUTS of several other contracts — e.g. an event is the coincidence of high
-chaos and an energy condition, and each tag value fuses tonality, sub-bass energy ratio, level-delta, and
-a speech flag. The rule that keeps these clean and testable:
+chaos and an energy condition, and each tag value fuses sub-bass tonality, the sub-bass energy ratio, and
+a level-delta over the baseline floor. (No speech flag is wired in this pipeline — the four starter tags
+key off sub-bass; a speech multiplier is future work, not this refactor.) The rule that keeps these clean
+and testable:
 
 **Coordination happens on an explicit *joined row*, never on references between units.** One dedicated
 join unit aligns the upstream outputs into a per-window row — the ONLY place fields co-locate:
@@ -224,16 +227,35 @@ Because the predicate is now one isolated pure function, a FUTURE change such as
 energy term (`chaos>thr ∧ energyΔ>φ ∧ !low_conf`) becomes: edit `seedWindow` + its one fixture test. That
 is a separate future change, NOT part of this refactor — this carve changes no output.
 
+**Worked example — the tag-value fusion de-closure** (`squelch-derive`). Today `valueFor`/`reliabilityFor`
+are **closures**: `makeValueFor(sq, baseline, eventCtx)` and `makeReliabilityFor(sq, eventCtx)` close over
+the band series, the baseline, and the per-event window lookup. The carve threads that closed-over state
+into an **explicit context** so each becomes a pure `(name, event, ctx)`:
+- `ctx = { bands:{subbass,low,mid,high}, bandN:{subbass,low,mid,high}, floorAt:(band,speed)->floor,
+  window:{speed,reliability} }` — this is the full field set the two fusions read (closes §12's
+  join-row open question).
+- `valueFor(name, event, ctx) -> number|null` — reads `ctx.bands.subbass[event.i_start..i_end]` for
+  tonality/onset, `ctx.bands.{low,mid,high}` + `ctx.bandN` for the sub-bass-ratio denominator, and
+  `ctx.floorAt("subbass", ctx.window.speed)` for level.
+- `reliabilityFor(name, event, ctx) -> number` — `0` if any event window is `low_conf`, else
+  `ctx.window.reliability`.
+
+This is a **signature change** (de-closuring), not just relocation: §10's "no math change" holds
+numerically, but the interface surgery is real, so both get a per-carve equivalence test (§8.3) asserting
+the de-closured functions reproduce the closures' output on the jc4 fixture.
+
 ## 8. Testing & safety net
 
 1. **Per-core deterministic unit tests** — every carved core (`kalmanStep`, causal front-end,
-   `scoreWindow`, `joinWindows`, `valueFor`, `seedWindow`, `segmentEvents`) gets a fixture test asserting
-   its `contract` (inputs → exact output/invariants). These are the "test once, reuse anywhere"
-   guarantees.
+   `scoreWindow`, `joinWindows`, `valueFor`, `reliabilityFor`, `seedWindow`, `segmentEvents`) gets a
+   fixture test asserting its `contract` (inputs → exact output/invariants). These are the "test once,
+   reuse anywhere" guarantees. New tests live in `tests/<unit>.test.js` following the existing naming
+   (e.g. `tests/join-windows.test.js`) and join the `npm test` chain.
 2. **Whole-pass byte-identity gate** — after every carve, regenerate `out/score-jc4/*-clean.json` and diff
    against golden; bit-for-bit unchanged. This is the existing gate used throughout SP3.
 3. **Equivalence test per carve** — assert `split composition == original` on a fixture (e.g. `prep +
-   fold(scoreWindow)` matches pre-carve `scoreResearch` output), a targeted check beyond the golden diff.
+   fold(scoreWindow)` matches pre-carve `scoreResearch`; the de-closured `valueFor`/`reliabilityFor`
+   reproduce the `makeValueFor`/`makeReliabilityFor` closures), a targeted check beyond the golden diff.
 4. **Registry generator as a test** (§5) — wired into `npm test`; fails on undocumented units, dangling
    `tested-by`, contracts naming unexported functions, or `mutates: setting:*`.
 
@@ -266,6 +288,11 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
 - **Byte-identical batch output** is the hard invariant. Any carve that changes a single value of
   `out/score-jc4/*-clean.json` is wrong and must be revised.
 - **No algorithm rewrites.** Carving relocates existing logic into named units; it does not change math.
+  (Interface surgery is allowed and expected — e.g. de-closuring `valueFor`/`reliabilityFor` in §7 — as
+  long as the numeric output is byte-identical.)
+- **Unit size.** Each carved core and each residual `compose` recipe targets ~100 lines and must stay
+  under a 300-line hard block. A "carve" that merely relocates a 300-line body intact has not separated
+  concerns and is not done.
 - **No streaming engine** (YAGNI). Cores are made *reusable*; the online baseline / incremental quantiles
   / ring buffers are a future project.
 - **Follow existing conventions:** dual Node/browser export (`module.exports` + `self.SensoryNav*`), the
@@ -278,8 +305,9 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
 1. Every `harness/**` scorer module carries a valid `@unit-begin` frontmatter block; the generator passes
    with zero violations and `docs/scorer-registry.md` lists all units grouped by causality.
 2. The generator's four validations (undocumented unit, dangling `tested-by`, unexported contract fn,
-   `mutates: setting:*`) run in `npm test` and fail the build when violated (proven by a temporary
-   negative check during Phase A).
+   `mutates: setting:*`) run in `npm test` and fail the build when violated — proven once during Phase A
+   by a **throwaway** negative check (introduce a violation, confirm `npm test` goes red, then revert; the
+   violation is NOT committed).
 3. The 5 carve targets each expose their reusable core as an independently importable, `mutates: none`,
    `pure`/`causal` function with its own passing deterministic unit test.
 4. `out/score-jc4/*-clean.json` regenerates **byte-identical** to the committed golden after every phase.
@@ -288,6 +316,9 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
    does it depend on, does it mutate anything, can I use it in realtime" without reading the source.
 7. The byte-identity tests **execute (not skip) in CI** against the committed tiny fixture — the safety
    net is CI-enforced, not local-only.
+8. Every carved core and residual `compose` recipe is under the 300-line hard block (§10), targeting ~100.
+9. The §6 map covers **every** module under `harness/**` (26 files): each is either block-only or a
+   carve target, and the generated registry lists all of them.
 
 ## 12. Risks & open questions
 
@@ -297,10 +328,13 @@ This cycle = frontmatter standard → scorer refactor. (`chartClient` is a separ
   byte-identity). Resolution per-unit during Phase B/C.
 - **`fft` in-place buffers** — likely `mutates: input:`; confirm during Phase B and declare, do not
   "clean up" (would change output/perf).
-- **Join-row field set** — the exact `joinWindows` row shape (§7) must carry every field the fusion units
-  and `detectEvents` read; enumerated during the `squelch-derive` carve, cross-checked against current
-  `makeValueFor` branches.
+- **Join-row / fusion-context field set** — CLOSED in §7: the de-closured `valueFor`/`reliabilityFor`
+  take `ctx = { bands, bandN, floorAt, window }`, which is the full field set both fusions and
+  `detectEvents` read. Cross-check against the current `makeValueFor` branches during the carve.
 - **Registry vs viz-inventory overlap** — both scrape `harness/**`; they must not fight over the leading
   comment. Mitigated by the prose-line-then-fenced-block layout (§4); verified in Phase A.
-- **Plan size** — 22 modules + 5 carves is a large plan; the writing-plans step will granularize into
-  per-phase, per-target tasks with the byte-identity gate as each task's exit check.
+- **Rollback** — each carve is an isolated commit gated by the per-phase byte-identity diff (§8.2): a
+  carve that fails the gate is `git revert`ed before the next target, so the tree is always at a
+  byte-identical, green state between carves.
+- **Plan size** — 26 `harness/**` modules + 5 carves (8 net-new cores) is a large plan; the writing-plans
+  step granularizes into per-phase, per-target tasks with the byte-identity gate as each task's exit check.
