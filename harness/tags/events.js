@@ -60,7 +60,8 @@ function segmentEvents(rows, seedFn, opts) {
   return out;
 }
 function detectEvents(series, opts) {
-  return segmentEvents(series, (row) => seedWindow(row, chaosThreshold(series, opts)), opts);
+  const thr = chaosThreshold(series, opts); // loop-invariant — compute once, not per seed test
+  return segmentEvents(series, (row) => seedWindow(row, thr), opts);
 }
 // Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
 {
