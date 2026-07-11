@@ -1,0 +1,58 @@
+name: Apply branch protection
+
+# Enshrines main's branch-protection rule AS CODE. The desired state lives in
+# .github/branch-protection/main.json (reviewable, version-controlled); this workflow applies it via
+# scripts/apply-branch-protection.sh so the setting can't silently drift in the UI — dispatch it to
+# reconcile. Pure git + the built-in gh CLI; zero marketplace actions.
+#
+# IMPORTANT: branch protection needs repo-ADMIN scope, which the built-in GITHUB_TOKEN does NOT have
+# and CANNOT be granted (there is no `administration` workflow permission). So this workflow requires
+# an admin PAT in the `ADMIN_TOKEN` secret — a fine-grained PAT scoped to THIS repo with
+# "Administration: read and write". That is a powerful secret; the secret-free alternative is to run
+# `scripts/apply-branch-protection.sh` locally with your own admin `gh` login (no CI secret at all).
+#
+# Manual dispatch only — a privileged (admin-token) job should not fire automatically.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-protection
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an admin token
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ADMIN_TOKEN}" ]; then
+            echo "::error::No ADMIN_TOKEN secret. Add a fine-grained PAT (Administration: read+write on this repo) as ADMIN_TOKEN, or run scripts/apply-branch-protection.sh locally. The built-in GITHUB_TOKEN cannot edit branch protection." >&2
+            exit 1
+          fi
+
+      - name: Fetch the config (no marketplace action)
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir src && cd src
+          git init --quiet
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch --quiet --depth 1 origin "$SHA"
+          git checkout --quiet FETCH_HEAD
+
+      - name: Apply protection from the committed config
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+        working-directory: src
+        run: bash scripts/apply-branch-protection.sh

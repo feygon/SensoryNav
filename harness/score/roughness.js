@@ -1,4 +1,16 @@
 // harness/score/roughness.js
+// Legacy linear (0-100) roughness score for one window, against a (pre-fit) speed-conditioned
+// baseline floor.
+// @unit-begin
+// unit:        roughness
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    scoreWindowRoughness(sp1win,speed,baseline,params) -> {roughness_raw,roughness,detected,magnitude}
+// deps:        score/baseline
+// realtime:    batch-only
+// tested-by:   tests/score-roughness.test.js
+// @unit-end
 "use strict";
 const { roughnessScoreRaw } = require("../../recorder/audio-scoring");
 const { floorAt, globalFloorAt } = require("./baseline");

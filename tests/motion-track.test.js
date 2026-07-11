@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { buildMotionTrack } = require("../harness/motion/motion-track");
+const { have, skipped } = require("./lib/fixtures");
 
 const BASE = 1000000;
 function windows(n, t0) {
@@ -78,11 +79,16 @@ assert.strictEqual(few[0].speed_confidence, 0);
 assert.strictEqual(few[0].heading_deg, null);
 
 // --- Real-pass smoke test (mechanics + trust model, not real motion) ---
-const sidecar = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "johnson-creek-pass-1-163508.json"), "utf8"));
-const realTrack = buildMotionTrack(sidecar.gps_samples, windows(25, sidecar.audio_first_frame_ms));
-assert.strictEqual(realTrack.length, 25);
-for (let i = 0; i < 25; i++) assert.strictEqual(realTrack[i].window_id, "w" + i);
-const lowTrust = realTrack.filter((r) => r.flags.includes("interpolated") || r.flags.includes("gap_unscored")).length;
-assert.ok(lowTrust >= 10, `expected many low-trust windows, got ${lowTrust}`);
+const realJson = path.join(__dirname, "..", "data", "johnson-creek-pass-1-163508.json");
+if (have(realJson)) {
+  const sidecar = JSON.parse(fs.readFileSync(realJson, "utf8"));
+  const realTrack = buildMotionTrack(sidecar.gps_samples, windows(25, sidecar.audio_first_frame_ms));
+  assert.strictEqual(realTrack.length, 25);
+  for (let i = 0; i < 25; i++) assert.strictEqual(realTrack[i].window_id, "w" + i);
+  const lowTrust = realTrack.filter((r) => r.flags.includes("interpolated") || r.flags.includes("gap_unscored")).length;
+  assert.ok(lowTrust >= 10, `expected many low-trust windows, got ${lowTrust}`);
+} else {
+  skipped("motion-track.test.js real-pass section", realJson);
+}
 
 console.log("motion-track tests passed");

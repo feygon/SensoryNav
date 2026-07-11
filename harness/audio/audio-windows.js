@@ -1,7 +1,22 @@
+// harness/audio/audio-windows.js
+// STFT over raw samples (per-frame band energies via fft.js), then groups frames into 1s
+// SP1 windows with per-window RMS/clip stats.
+// @unit-begin
+// unit:        audio-windows
+// causality:   causal
+// state:       none
+// mutates:     none
+// contract:    framesToWindows(samples,sampleRate,audioFirstFrameMs) -> windows[]
+//              stft(samples,sampleRate) -> frames[{centerSample,energies}]
+//              windowIndexFor(frameCenterSample,samplesPerWindow) -> number
+// deps:        audio/fft
+// realtime:    reuse-as-is
+// tested-by:   tests/audio-windows.test.js
+// @unit-end
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
-const { bandEnergiesFromSpectrum, averageWindowEnergies } = require("../../recorder/audio-scoring");
-const { realFftDb } = require("./fft");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
+var { bandEnergiesFromSpectrum, averageWindowEnergies } = (typeof require !== "undefined") ? require("../../recorder/audio-scoring") : self.SensoryNavCore;
+var { realFftDb } = (typeof require !== "undefined") ? require("./fft") : self.SensoryNavScore;
 
 const FFT_SIZE = CONSTANTS.FFT_SIZE;                 // 2048
 const HOP = FFT_SIZE / 2;                            // 1024
@@ -88,4 +103,9 @@ function framesToWindows(samples, sampleRate, audioFirstFrameMs) {
   return windows;
 }
 
-module.exports = { framesToWindows, windowIndexFor, stft };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { framesToWindows, windowIndexFor, stft };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

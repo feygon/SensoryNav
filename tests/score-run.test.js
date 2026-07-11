@@ -7,6 +7,7 @@ const os = require("os");
 const { scorePasses, runScorer } = require("../harness/score/run-scorer");
 const { buildMotionTrack } = require("../harness/motion/motion-track");
 const { loadPass } = require("../harness/audio/load-pass");
+const { have, skipped } = require("./lib/fixtures");
 
 // --- Synthetic multi-pass: qualifies bins → speed-conditioned path + validation ---
 function synthPass(passId, base, withFelt) {
@@ -35,25 +36,30 @@ assert.ok(res.batch.aggregate.presence.auc > 0.9);
 // loadPass(wavPath, sidecarPath) reads BOTH files and returns { windows, sampleRate, warnings };
 // it runs framesToWindows internally, so its `.windows` ARE the SP1 windows (do not re-run framesToWindows).
 const sidecarPath = path.join(__dirname, "..", "data", "johnson-creek-pass-1-163508.json");
-const sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
-const wavPath = path.join(path.dirname(sidecarPath), sidecar.audio.wav_filename);
-const loaded = loadPass(wavPath, sidecarPath);
-const sp1real = loaded.windows;
-const sp2real = buildMotionTrack(sidecar.gps_samples, sp1real.map((w) => ({ window_id: w.window_id, started_at_ms: w.started_at_ms })), {});
-const realRes = scorePasses([{ sp1windows: sp1real, sp2track: sp2real, felt: null }], {});
-// Verified empirically: this pass yields 25 windows, only 12 reliable (GPS gaps zero the rest),
-// 12 < MIN_BIN_SAMPLES(20) → 0 qualified bins → baseline collapses to global for every band; and felt=null → no_felt.
-assert.strictEqual(realRes.baseline_meta.low.fell_back_to_global, true);
-assert.strictEqual(realRes.batch.aggregate.presence.status, "no_felt");
+const realWavPath = path.join(__dirname, "..", "data", "johnson-creek-pass-1-163508.wav");
+if (have(sidecarPath, realWavPath)) {
+  const sidecar = JSON.parse(fs.readFileSync(sidecarPath, "utf8"));
+  const wavPath = path.join(path.dirname(sidecarPath), sidecar.audio.wav_filename);
+  const loaded = loadPass(wavPath, sidecarPath);
+  const sp1real = loaded.windows;
+  const sp2real = buildMotionTrack(sidecar.gps_samples, sp1real.map((w) => ({ window_id: w.window_id, started_at_ms: w.started_at_ms })), {});
+  const realRes = scorePasses([{ sp1windows: sp1real, sp2track: sp2real, felt: null }], {});
+  // Verified empirically: this pass yields 25 windows, only 12 reliable (GPS gaps zero the rest),
+  // 12 < MIN_BIN_SAMPLES(20) → 0 qualified bins → baseline collapses to global for every band; and felt=null → no_felt.
+  assert.strictEqual(realRes.baseline_meta.low.fell_back_to_global, true);
+  assert.strictEqual(realRes.batch.aggregate.presence.status, "no_felt");
 
-// --- runScorer writes the four artifacts to a temp dir ---
-const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "sp3-"));
-const summary = runScorer({ passFiles: [path.join(__dirname, "..", "data", "johnson-creek-pass-1-163508.json")], outDir, params: {} });
-assert.ok(fs.existsSync(path.join(outDir, "summary.json")));
-assert.ok(fs.existsSync(path.join(outDir, "scored-0.json")));
-assert.ok(fs.existsSync(path.join(outDir, "scored-0.csv")));
-assert.ok(fs.existsSync(path.join(outDir, "inspection-0.html")));
-assert.ok(summary.aggregate);
+  // --- runScorer writes the four artifacts to a temp dir ---
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "sp3-"));
+  const summary = runScorer({ passFiles: [sidecarPath], outDir, params: {} });
+  assert.ok(fs.existsSync(path.join(outDir, "summary.json")));
+  assert.ok(fs.existsSync(path.join(outDir, "scored-0.json")));
+  assert.ok(fs.existsSync(path.join(outDir, "scored-0.csv")));
+  assert.ok(fs.existsSync(path.join(outDir, "inspection-0.html")));
+  assert.ok(summary.aggregate);
+} else {
+  skipped("score-run.test.js real-pass sections", sidecarPath);
+}
 
 // --- Malformed sidecar guard: missing audio.wav_filename produces a legible error ---
 {

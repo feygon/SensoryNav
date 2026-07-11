@@ -1,9 +1,23 @@
 // harness/motion/motion-track.js
+// SP2 motion track: projects + RTS-smooths GPS fixes (kalman-smoother), then classifies each
+// SP1 window's speed/heading/confidence/source against the smoothed track and Doppler.
+// @unit-begin
+// unit:        motion-track
+// causality:   compose
+// state:       none
+// mutates:     none
+// contract:    buildMotionTrack(gpsSamples,windows,params) -> track[{window_id,lat,lon,speed_mps,heading_deg,speed_confidence,speed_source,flags}]
+//              classifyWindow(t,startedAtMs,speed,vEast,vNorth,velTraceVar,fixes,params) -> {confidence,source,flags,heading}
+//              confidenceFromCov(velTraceVar,params) -> number
+// deps:        motion/geo-project, motion/kalman-smoother
+// realtime:    batch-only
+// tested-by:   tests/motion-track.test.js, tests/motion-track-latlon.test.js
+// @unit-end
 "use strict";
-const { CONSTANTS } = require("../../recorder/constants");
-const { projectFixes, bearingDeg, R_EARTH } = require("./geo-project");
+var { CONSTANTS } = (typeof require !== "undefined") ? require("../../recorder/constants") : self.SensoryNavCore;
+var { projectFixes, bearingDeg, R_EARTH } = (typeof require !== "undefined") ? require("./geo-project") : self.SensoryNavScore;
 const DEG = Math.PI / 180;
-const { smooth, evaluateAt } = require("./kalman-smoother");
+var { smooth, evaluateAt } = (typeof require !== "undefined") ? require("./kalman-smoother") : self.SensoryNavScore;
 
 const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS;
 
@@ -119,4 +133,9 @@ function buildMotionTrack(gpsSamples, windows, params) {
   return windows.map((w) => windowMotion(w, smoothed, points, p, lat0, lon0));
 }
 
-module.exports = { buildMotionTrack, classifyWindow, confidenceFromCov, sortDedupFixes };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { buildMotionTrack, classifyWindow, confidenceFromCov, sortDedupFixes };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

@@ -1,0 +1,25 @@
+/* pipeline.css — the shared pipeline/tier strip (rendered by pipeline.js). Theme-aware; no
+   pure-white surfaces in dark mode. Linked on every page that shows the strip. */
+
+.arch { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-bottom: 22px; }
+.tier { flex: 1 1 150px; min-width: 140px; background: #f2f2f2; border: 1px solid #cfcfcf; border-radius: 10px; padding: 12px 13px; position: relative; }
+html.dark-mode body .tier { background: #1b1b1b; border-color: #555; }
+.tier .ico { font-size: 22px; line-height: 1; }
+.tier .t { font-weight: 700; margin: 6px 0 2px; font-size: 14.5px; }
+.tier .d { color: #666; font-size: 12.5px; }
+html.dark-mode body .tier .d { color: #9aa2ac; }
+.tier .arrow { position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: #9aa2ac; font-size: 18px; z-index: 1; }
+.tier.live { border-left: 3px solid #5fd35f; }             /* green = live */
+.tier.planned { border-left: 3px solid #ebd73c; border-style: dashed; opacity: .82; } /* yellow dashed = planned */
+.tier.active { outline: 2px solid #4da3ff; outline-offset: -1px; opacity: 1; } /* the current page */
+
+.tier-link { text-decoration: none; color: inherit; display: block; transition: border-color .12s, box-shadow .12s, transform .12s; }
+.tier-link:hover { border-color: #4da3ff; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); transform: translateY(-1px); }
+.tier .cta { color: #2f7fd6; font-size: 12.5px; font-weight: 700; margin-top: 8px; }
+html.dark-mode body .tier .cta { color: #7fbaff; }
+
+.badge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .03em; border-radius: 999px; padding: 1px 8px; vertical-align: middle; margin-left: 6px; }
+.badge.live { background: rgba(95, 211, 95, .16); color: #2e8b2e; }
+html.dark-mode body .badge.live { background: rgba(95, 211, 95, .18); color: #7ee07e; }
+.badge.planned { background: rgba(235, 215, 60, .18); color: #8a7400; }
+html.dark-mode body .badge.planned { background: rgba(235, 215, 60, .16); color: #ebd73c; }

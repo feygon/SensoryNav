@@ -42,15 +42,31 @@ jobs:
           # 2. Assemble the deployable web subset (explicit allowlist).
           rm -rf _site && mkdir _site
           for f in index.html capture.html analyze.html links.html tingles.html tingles-mufasa.html \
-                   styles.css capture.css analyze.css theme.js app.js capture.js analyze.js analyze-worker.js ribbon-render.js capture-worklet.js \
+                   styles.css capture.css analyze.css pipeline.css timeline.css theme.js app.js capture.js analyze.js analyze-worker.js ribbon-render.js timeline-render.js pipeline.js capture-worklet.js \
                    build.json project-entry.json; do
             [ -f "src/$f" ] && cp -- "src/$f" _site/
           done
           if [ -d src/recorder ]; then mkdir -p _site/recorder && cp src/recorder/*.js _site/recorder/; fi
-          # analysis pipeline modules the worker loads (importScripts, relative to site root)
-          mkdir -p _site/harness/audio _site/harness/score
-          cp src/harness/audio/wav-decoder.js _site/harness/audio/
-          cp src/harness/score/spectral-chaos.js _site/harness/score/
+          # Analysis pipeline modules the analyze worker loads at runtime. Derived from the MODULES
+          # array in analyze-worker.js so this allowlist can NEVER drift out of sync with the worker
+          # (add a module there and it deploys automatically; nothing else under harness/ is served).
+          # Paths are site-root-relative, matching the worker's fetch() calls.
+          modules="$(sed -n '/MODULES = \[/,/];/p' src/analyze-worker.js | grep -oE '"[^"]+\.js"' | tr -d '"')"
+          # Fail CLOSED: if the extraction yields far fewer than expected (e.g. the `var MODULES = [`
+          # form changed and the parse broke), abort rather than ship a worker that 404s every module.
+          mod_count="$(printf '%s\n' "$modules" | grep -c .)"
+          if [ "$mod_count" -lt 20 ]; then
+            echo "deploy: parsed only $mod_count worker modules from analyze-worker.js (expected >=20) — MODULES parse likely broke" >&2
+            exit 1
+          fi
+          printf '%s\n' "$modules" | while read -r m; do
+            [ -z "$m" ] && continue
+            if [ ! -f "src/$m" ]; then echo "deploy: worker MODULE missing from source: $m" >&2; exit 1; fi
+            mkdir -p "_site/$(dirname "$m")"
+            cp -- "src/$m" "_site/$m"
+          done
+          # Event registry the worker reads for tag extraction (fetched by analyze.js).
+          mkdir -p _site/harness/tags && cp src/harness/tags/registry.json _site/harness/tags/
           [ -d src/assets ] && cp -r src/assets _site/
           [ -d src/sample ] && cp -r src/sample _site/
           touch _site/.nojekyll # serve files as-is, no Jekyll processing

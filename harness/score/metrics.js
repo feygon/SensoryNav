@@ -1,4 +1,22 @@
 // harness/score/metrics.js
+// Weighted statistics primitives shared by baseline fitting and validation: quantiles, rank
+// (Spearman) correlation, ROC AUC, precision/recall, and best-F1 threshold search.
+// @unit-begin
+// unit:        metrics
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    quantile(values,q) -> number
+//              weightedQuantile(values,weights,q) -> number
+//              spearman(xs,ys) -> number
+//              weightedSpearman(xs,ys,weights) -> number
+//              rocAuc(scores,labels,weights) -> number
+//              precisionRecall(scores,labels,threshold,weights) -> {precision,recall,f1}
+//              bestF1Threshold(scores,labels,weights) -> {threshold,f1}
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/score-metrics.test.js
+// @unit-end
 "use strict";
 
 function quantile(values, q) {

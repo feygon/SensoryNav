@@ -1,4 +1,17 @@
 // harness/score/felt.js
+// Loads + validates a "felt" ground-truth file (rider-marked spans/events) and maps it onto SP1
+// windows for the validation pass.
+// @unit-begin
+// unit:        felt
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    loadFelt(obj) -> {spans,events}
+//              mapFeltToWindows(felt,windows) -> perWindow[{felt_present,felt_magnitude}]
+// deps:        —
+// realtime:    batch-only
+// tested-by:   tests/score-felt.test.js
+// @unit-end
 "use strict";
 const { CONSTANTS } = require("../../recorder/constants");
 const WINDOW_DURATION_MS = CONSTANTS.WINDOW_DURATION_MS;

@@ -1,3 +1,18 @@
+// harness/score/spectral-chaos.js
+// Per-band (subbass/low/mid/high) tonality-chaos time series: hop-windowed FFT power spectrum,
+// tonality (peak-vs-median energy ratio) -> chaos = 1-tonality, plus a per-run near-silence flag.
+// @unit-begin
+// unit:        spectral-chaos
+// causality:   causal
+// state:       none
+// mutates:     none
+// contract:    computeSpectralChaos(samples,fs,opts) -> {params,subbass[],low[],mid[],high[]}
+//              tonality(power,loBin,hiBin,k) -> number[0,1]
+//              powerSpectrum(samples,start,N) -> Float64Array
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/score-spectral-chaos.test.js
+// @unit-end
 "use strict";
 const SBANDS = [
   { key: "subbass", lo: 20, hi: 80, N: 16384 },

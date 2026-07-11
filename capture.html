@@ -6,8 +6,10 @@
   <meta name="color-scheme" content="light dark">
   <title>SensoryNav — Capture &amp; Pipeline</title>
   <link rel="stylesheet" href="styles.css?v=0.2.6">
+  <link rel="stylesheet" href="pipeline.css?v=0.2.6">
   <link rel="stylesheet" href="capture.css?v=0.2.6">
   <script src="theme.js?v=0.2.6"></script>
+  <script src="pipeline.js"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Site">
@@ -20,39 +22,8 @@
     <h1>Capture &amp; Pipeline</h1>
     <p class="sub">Record a drive, analyze it on your device, and see what it becomes — the front end of a road-feel map for sensory-sensitive drivers.</p>
 
-    <!-- Multi-tier architecture: what happens to a capture, and what's live vs planned. -->
-    <section class="arch" aria-label="System architecture">
-      <div class="tier live">
-        <div class="ico">🎙️</div>
-        <div class="t">Capture <span class="badge live">live</span></div>
-        <div class="d">Audio + GPS recorded in the browser, on your device.</div>
-        <span class="arrow" aria-hidden="true">→</span>
-      </div>
-      <a class="tier live tier-link" href="analyze.html">
-        <div class="ico">🧠</div>
-        <div class="t">Local analysis <span class="badge live">live</span></div>
-        <div class="d">Spectral-chaos + roughness + tags computed locally. Audio never leaves the device.</div>
-        <div class="cta">Upload a capture →</div>
-        <span class="arrow" aria-hidden="true">→</span>
-      </a>
-      <div class="tier planned">
-        <div class="ico">🔒</div>
-        <div class="t">Deidentified upload <span class="badge planned">planned</span></div>
-        <div class="d">Only derived features leave — no audio, identifiers stripped.</div>
-        <span class="arrow" aria-hidden="true">→</span>
-      </div>
-      <div class="tier planned">
-        <div class="ico">🗺️</div>
-        <div class="t">Aggregator <span class="badge planned">planned</span></div>
-        <div class="d">Weights many trips into one confident, per-location road-feel signal.</div>
-        <span class="arrow" aria-hidden="true">→</span>
-      </div>
-      <div class="tier planned">
-        <div class="ico">📊</div>
-        <div class="t">Route map <span class="badge planned">planned</span></div>
-        <div class="d">A calmer-route chooser and real-time rough-stretch warnings.</div>
-      </div>
-    </section>
+    <!-- Shared pipeline/tier strip (pipeline.js) — same visual on every page. -->
+    <div id="pipeline-strip" data-active="capture"></div>
 
     <div class="grid">
       <!-- Recorder card: all live-recorder hooks preserved (capture.js binds these IDs). -->
@@ -69,6 +40,11 @@
         <div class="controls">
           <button id="start" type="button">Start recording</button>
           <button id="stop" type="button" disabled>Stop recording</button>
+        </div>
+
+        <div class="stop-opts" aria-label="On stop">
+          <label class="stop-opt"><input type="checkbox" id="analyze-on-stop" checked> Analyze upon stopping</label>
+          <label class="stop-opt"><input type="checkbox" id="also-download"> Also download files</label>
         </div>
 
         <div class="trim-opts" aria-label="Optional privacy trims">
@@ -112,6 +88,7 @@
   <script src="recorder/capture-state.js"></script>
   <script src="recorder/capture-manifest.js"></script>
   <script src="recorder/trim-capture.js"></script>
+  <script src="recorder/capture-handoff.js"></script>
   <script src="capture.js"></script>
 </body>
 </html>

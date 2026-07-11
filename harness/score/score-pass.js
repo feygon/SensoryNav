@@ -1,4 +1,16 @@
 // harness/score/score-pass.js
+// Per-pass fusion: joins SP1 windows with the SP2 motion track, scores roughness against a
+// (pre-fit) baseline, computes reliability, and attaches felt ground-truth if provided.
+// @unit-begin
+// unit:        score-pass
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    scorePass(sp1windows,sp2track,baseline,felt,params) -> scored[]
+// deps:        score/roughness, score/reliability, score/felt
+// realtime:    batch-only
+// tested-by:   tests/score-pass.test.js
+// @unit-end
 "use strict";
 const { scoreWindowRoughness } = require("./roughness");
 const { windowReliability } = require("./reliability");

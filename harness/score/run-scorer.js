@@ -1,4 +1,17 @@
 // harness/score/run-scorer.js
+// Top-level batch driver: loads passes from disk, pools samples to fit one baseline across all
+// passes, scores + validates each pass, and writes summary/scored/inspection files to outDir.
+// @unit-begin
+// unit:        run-scorer
+// causality:   acausal
+// state:       none
+// mutates:     io:fs
+// contract:    scorePasses(passes,params) -> {baseline,baseline_meta,per_pass_scored,batch}
+//              runScorer(opts{passFiles,outDir,params}) -> summary
+// deps:        audio/load-pass, motion/motion-track, score/baseline, score/reliability, score/score-pass, score/validate, score/report
+// realtime:    batch-only
+// tested-by:   tests/score-run.test.js
+// @unit-end
 "use strict";
 const fs = require("fs");
 const path = require("path");

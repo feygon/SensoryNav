@@ -1,6 +1,18 @@
 // harness/score/validate.js
 "use strict";
-const { rocAuc, precisionRecall, bestF1Threshold, weightedSpearman } = require("./metrics");
+var { rocAuc, precisionRecall, bestF1Threshold, weightedSpearman } = (typeof require !== "undefined") ? require("./metrics") : self.SensoryNavScore;
+
+// @unit-begin
+// unit:        validate
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    validatePass(scored,params) -> summary{n_total,n_excluded,presence,magnitude}
+//              validateBatch(perPassScored,params) -> {per_pass[],aggregate}
+// deps:        score/metrics
+// realtime:    batch-only
+// tested-by:   tests/score-validate.test.js
+// @unit-end
 
 const DEFAULTS = { DETECT_TAU: 12, MIN_SPEARMAN_N: 5 };
 
@@ -59,4 +71,9 @@ function validateBatch(perPassScored, params) {
   return { per_pass: perPassScored.map((s) => buildSummary(s, p)), aggregate: buildSummary(pooled, p) };
 }
 
-module.exports = { validatePass, validateBatch };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { validatePass, validateBatch };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

@@ -13,6 +13,18 @@
 // delta is already speed-normalized — a bump reads the same magnitude slow or fast. Any future
 // speed-dependent *sensory* weighting (a gentle jolt at 3 mph vs. a jarring one at 40) belongs
 // on top of this measurement, not inside it.
+// @unit-begin
+// unit:        roughness-db
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    roughnessDb(energies{low,mid,high},floors{low,mid,high},weights{low,mid,high}) -> number>=0
+//              toDb(energy) -> number
+//              bandDeltaDb(energy,floor) -> number>=0
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/score-roughness-db.test.js
+// @unit-end
 "use strict";
 
 const EPS_ENERGY = 1e-12;      // guards log10(0); ~ -120 dB
@@ -40,4 +52,9 @@ function roughnessDb(energies, floors, weights) {
   return sum;
 }
 
-module.exports = { toDb, bandDeltaDb, roughnessDb, EPS_ENERGY, BANDS };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { toDb, bandDeltaDb, roughnessDb, EPS_ENERGY, BANDS };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "sensorynav-capture-v1",
+  "pass_label": "test-pass-1",
+  "recording_start_ms": 1783041486465,
+  "audio_first_frame_ms": 1783041486778,
+  "duration_ms": 6000,
+  "partial": false,
+  "truncation_reason": null,
+  "notes": "",
+  "audio": {
+    "wav_filename": "test-pass-1.wav",
+    "sample_rate": 48000,
+    "channels": 1,
+    "bit_depth": 16
+  },
+  "audio_settings_requested": {
+    "autoGainControl": false,
+    "noiseSuppression": false,
+    "echoCancellation": false
+  },
+  "audio_settings_applied": {
+    "autoGainControl": false,
+    "channelCount": 1,
+    "deviceId": "default",
+    "echoCancellation": false,
+    "groupId": "a55edbd57c2b37027576e114bf206d97aa59883a44664b25be4c7eae304b7196",
+    "latency": 0.04,
+    "noiseSuppression": false,
+    "sampleRate": 48000,
+    "sampleSize": 16,
+    "voiceIsolation": false
+  },
+  "device": {
+    "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36"
+  },
+  "gps": {
+    "enable_high_accuracy": true,
+    "fix_count": 613,
+    "observed_fix_hz": 1.0039600646996485
+  },
+  "gps_samples": [
+    {
+      "sample_id": "g1",
+      "captured_at_ms": 1783041487504,
+      "latitude": 45.455903,
+      "longitude": -122.5795333,
+      "speed_mps": null,
+      "accuracy_meters": 60
+    },
+    {
+      "sample_id": "g2",
+      "captured_at_ms": 1783041492086,
+      "latitude": 45.4564707,
+      "longitude": -122.5790926,
+      "speed_mps": 2.259999990463257,
+      "accuracy_meters": 35.61199951171875
+    }
+  ]
+}

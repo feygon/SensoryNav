@@ -6,4 +6,9 @@ assert.strictEqual(validateTag(good).ok, true);
 assert.strictEqual(validateTag({ name: "x" }).ok, false); // missing fields
 const reg = loadRegistry(require("path").join(__dirname, "..", "harness", "tags", "registry"));
 assert.ok(reg["tonality"] && reg["level"], "registry missing starter tags");
+// loadRegistry pass-through: a Worker can't touch fs, so the worker wrapper parses the
+// registry JSON itself and hands loadRegistry the already-parsed object; loadRegistry must
+// return it unchanged (identity, not a copy) instead of treating it as a directory path.
+const already = { foo: { name: "foo", display: "Foo" } };
+assert.strictEqual(loadRegistry(already), already, "loadRegistry must pass an object through unchanged");
 console.log("tags-schema tests passed");

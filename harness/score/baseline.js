@@ -5,6 +5,20 @@
 // name when both are loaded as classic <script>s in one shared global scope.
 var { weightedQuantile } = (typeof require !== "undefined") ? require("./metrics") : self.SensoryNavScore;
 
+// @unit-begin
+// unit:        baseline
+// causality:   acausal
+// state:       none
+// mutates:     none
+// contract:    fitBaseline(samples,params) -> baseline{low,mid,high,subbass:{points,global,meta}}
+//              floorAt(baseline,band,speed) -> number
+//              globalFloorAt(baseline,band) -> number
+//              baselineMeta(baseline) -> meta
+// deps:        score/metrics
+// realtime:    needs-streaming-variant
+// tested-by:   tests/score-baseline.test.js
+// @unit-end
+
 // OVERLAP_TIERS: opt-in. Each [spanThreshold, fraction] widens a bin's floor-estimation
 // speed range by `fraction` of the bin's own span on EACH side, pulling in neighbour
 // samples — but only for bins whose span exceeds the threshold. First matching tier wins,

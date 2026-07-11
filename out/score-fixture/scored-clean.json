@@ -1,0 +1,146 @@
+[
+  {
+    "window_id": "w0",
+    "started_at_ms": 1783041486778,
+    "lat": 45.45591298622776,
+    "lon": -122.57952554778831,
+    "speed_mps": 14.323402642861645,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 30.99298725680778,
+    "roughness": 31,
+    "detected": true,
+    "magnitude": 30.99298725680778,
+    "roughness_null": 30.99298725680778,
+    "roughness_db": 1.79,
+    "reliability": 0.0022861810104508828,
+    "reliability_flags": [
+      "low_speed_confidence",
+      "low_accuracy"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [
+      "low_accuracy"
+    ],
+    "felt_present": false,
+    "felt_magnitude": null
+  },
+  {
+    "window_id": "w1",
+    "started_at_ms": 1783041487778,
+    "lat": 45.45602611482035,
+    "lon": -122.5794377271599,
+    "speed_mps": 14.323402642861645,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 38.36474802122434,
+    "roughness": 38,
+    "detected": true,
+    "magnitude": 38.36474802122434,
+    "roughness_null": 38.36474802122434,
+    "roughness_db": 2.39,
+    "reliability": 0.0022634948670722447,
+    "reliability_flags": [
+      "low_speed_confidence",
+      "low_accuracy"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [
+      "low_accuracy"
+    ],
+    "felt_present": false,
+    "felt_magnitude": null
+  },
+  {
+    "window_id": "w2",
+    "started_at_ms": 1783041488778,
+    "lat": 45.45613924341293,
+    "lon": -122.57934990653148,
+    "speed_mps": 14.323402642861645,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 37.54855036520296,
+    "roughness": 38,
+    "detected": true,
+    "magnitude": 37.54855036520296,
+    "roughness_null": 37.54855036520296,
+    "roughness_db": 2.42,
+    "reliability": 0.0022232365901907725,
+    "reliability_flags": [
+      "low_speed_confidence",
+      "low_accuracy"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [
+      "low_accuracy"
+    ],
+    "felt_present": false,
+    "felt_magnitude": null
+  },
+  {
+    "window_id": "w3",
+    "started_at_ms": 1783041489778,
+    "lat": 45.45625288897845,
+    "lon": -122.579261684582,
+    "speed_mps": 14.375906507589319,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 100,
+    "roughness": 100,
+    "detected": true,
+    "magnitude": 100,
+    "roughness_null": 100,
+    "roughness_db": 5.19,
+    "reliability": 0.0022065727187389095,
+    "reliability_flags": [
+      "low_speed_confidence"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [],
+    "felt_present": false,
+    "felt_magnitude": null
+  },
+  {
+    "window_id": "w4",
+    "started_at_ms": 1783041490778,
+    "lat": 45.4563664322552,
+    "lon": -122.57917354203828,
+    "speed_mps": 14.375906507589319,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 5.219469134954158,
+    "roughness": 5,
+    "detected": false,
+    "magnitude": 5.219469134954158,
+    "roughness_null": 5.219469134954158,
+    "roughness_db": 0.31,
+    "reliability": 0.0022462243782037958,
+    "reliability_flags": [
+      "low_speed_confidence"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [],
+    "felt_present": false,
+    "felt_magnitude": null
+  },
+  {
+    "window_id": "w5",
+    "started_at_ms": 1783041491778,
+    "lat": 45.45647997553196,
+    "lon": -122.57908539949456,
+    "speed_mps": 14.375906507589319,
+    "heading_deg": 28.569719333943453,
+    "roughness_raw": 20.917225283549925,
+    "roughness": 21,
+    "detected": true,
+    "magnitude": 20.917225283549925,
+    "roughness_null": 20.917225283549925,
+    "roughness_db": 1.5,
+    "reliability": 0.001135683517112056,
+    "reliability_flags": [
+      "low_speed_confidence",
+      "doppler_mismatch"
+    ],
+    "speed_source": "derived",
+    "sp2_flags": [
+      "doppler_mismatch"
+    ],
+    "felt_present": false,
+    "felt_magnitude": null
+  }
+]

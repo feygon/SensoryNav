@@ -62,7 +62,9 @@
       label: document.getElementById("label"),
       warning: document.getElementById("warning"),
       trimStart: document.getElementById("trim-start"),
-      trimEnd: document.getElementById("trim-end")
+      trimEnd: document.getElementById("trim-end"),
+      analyzeOnStop: document.getElementById("analyze-on-stop"),
+      alsoDownload: document.getElementById("also-download")
     };
     ui.start.addEventListener("click", onStart);
     ui.stop.addEventListener("click", onStop);
@@ -243,8 +245,27 @@
     if (src.gpsSamples.length === 0) {
       ui.warning.textContent = WARNINGS.noGps;
     }
-    downloadBlob(new Blob([wav], { type: "audio/wav" }), wavName);
-    downloadBlob(new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" }), label + ".json");
+    const wavBlob = new Blob([wav], { type: "audio/wav" });
+    const jsonBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+    const jsonName = label + ".json";
+    const analyze = ui.analyzeOnStop && ui.analyzeOnStop.checked;
+    const alsoDl = ui.alsoDownload && ui.alsoDownload.checked;
+
+    // "Analyze upon stopping" OFF -> download as before. ON -> hand off to the analyze page (and
+    // also download only if "Also download files" is checked).
+    if (!analyze) {
+      downloadBlob(wavBlob, wavName);
+      downloadBlob(jsonBlob, jsonName);
+      return;
+    }
+    if (alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); }
+    ui.status.textContent = "Handing this capture to Local Analysis…";
+    window.SensoryNavHandoff.putHandoff({ wavBlob: wavBlob, wavName: wavName, manifest: manifest, jsonName: jsonName, savedAt: Date.now() })
+      .then(function () { setTimeout(function () { window.location.href = "analyze.html"; }, alsoDl ? 500 : 0); })
+      .catch(function (err) {
+        ui.warning.textContent = "Could not hand off to analysis (" + err.message + ") — downloaded the files instead.";
+        if (!alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); }
+      });
   }
 
   function streamLost(reason) {

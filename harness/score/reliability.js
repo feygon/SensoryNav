@@ -1,4 +1,16 @@
 // harness/score/reliability.js
+// Per-window reliability weight: multiplies speed-confidence, clip, frame-coverage, and
+// near-floor gates into one [0,1] factor plus the flags that drove it down.
+// @unit-begin
+// unit:        reliability
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    windowReliability(sp1win,sp2rec,params) -> {reliability,flags}
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/score-reliability.test.js
+// @unit-end
 "use strict";
 
 const DEFAULTS = { CLIP_TOL: 0.02, FULL_FRAMES: 45 };
@@ -22,4 +34,9 @@ function windowReliability(sp1win, sp2rec, params) {
   return { reliability, flags };
 }
 
-module.exports = { windowReliability };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { windowReliability };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}

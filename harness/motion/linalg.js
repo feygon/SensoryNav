@@ -1,4 +1,22 @@
 // harness/motion/linalg.js
+// Small dense-matrix ops (arrays-of-arrays) backing the Kalman smoother: multiply, transpose,
+// identity, add/sub, scale, and Gauss-Jordan solve.
+// @unit-begin
+// unit:        linalg
+// causality:   pure
+// state:       none
+// mutates:     none
+// contract:    matMul(A,B) -> C
+//              transpose(A) -> T
+//              identity(n) -> I
+//              matAdd(A,B) -> C
+//              matSub(A,B) -> C
+//              scale(A,k) -> C
+//              solve(A,B) -> X
+// deps:        —
+// realtime:    reuse-as-is
+// tested-by:   tests/linalg.test.js
+// @unit-end
 "use strict";
 
 function matMul(A, B) {
@@ -72,4 +90,9 @@ function solve(A, B) {
   return X;
 }
 
-module.exports = { matMul, transpose, identity, matAdd, matSub, scale, solve };
+// Dual-mode: Node (tests, pipeline) via module.exports; browser/worker via self.SensoryNavScore.
+{
+  const exported = { matMul, transpose, identity, matAdd, matSub, scale, solve };
+  if (typeof module !== "undefined" && module.exports) { module.exports = exported; }
+  if (typeof self !== "undefined") { self.SensoryNavScore = Object.assign(self.SensoryNavScore || {}, exported); }
+}
