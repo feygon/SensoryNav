@@ -38,16 +38,33 @@
     gpsSamples: [],
     gpsCounter: 0,
     recordingStartMs: 0,
-    passTimestamp: "",
     audioFirstFrameMs: 0,
     audioContext: null,
     workletNode: null,
     mediaStream: null,
     geoWatchId: null,
     wakeLock: null,
-    appliedSettings: null,
-    baseLabel: "johnson-creek-pass-1"
+    appliedSettings: null
   };
+
+  // Default filename numbering. A web page can't read the Downloads folder, so "lowest unused Pass-N"
+  // means lowest not among the numbers THIS app has downloaded, persisted in localStorage across
+  // refreshes. The pure logic lives in recorder/pass-namer.js; the storage/DOM side effects live here.
+  const USED_KEY = "sn.usedPassNumbers";
+  function loadUsed() {
+    try { const a = JSON.parse(localStorage.getItem(USED_KEY)); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function saveUsed(arr) { try { localStorage.setItem(USED_KEY, JSON.stringify(arr)); } catch (e) { /* storage disabled */ } }
+  function setDefaultName() { ui.label.value = core.passName(core.nextUnused(loadUsed())); }
+  // After a file downloads: if it used a canonical Pass-N name, record N so it's never re-offered, then
+  // advance the field to the next lowest unused. A custom (renamed) label parses to null → consumes no
+  // numeral, so that number stays available.
+  function afterDownload(label) {
+    const n = core.parsePassNumber(label);
+    if (n !== null) { const used = loadUsed(); if (used.indexOf(n) < 0) { used.push(n); saveUsed(used); } }
+    setDefaultName();
+  }
 
   let ui = {};
 
@@ -69,6 +86,7 @@
     ui.start.addEventListener("click", onStart);
     ui.stop.addEventListener("click", onStop);
     document.addEventListener("visibilitychange", onVisibility);
+    setDefaultName(); // default the label to the lowest unused Pass-N
     render();
   }
 
@@ -119,7 +137,6 @@
 
   async function startRecording() {
     state.recordingStartMs = Date.now();
-    state.passTimestamp = hhmmss(new Date());
     state.frames = [];
     state.totalSamples = 0;
     state.gpsSamples = [];
@@ -218,12 +235,13 @@
       const trimmed = core.trimCapture(src, { dropFirstSec, dropLastSec });
       if (trimmed === null) {
         ui.warning.textContent = "Recording too short to remove " + (dropFirstSec + dropLastSec) + " s — nothing was saved.";
+        transition("reset"); // back to idle so the user can record again without a refresh
         return;
       }
       src = trimmed;
     }
 
-    const label = (ui.label.value || state.baseLabel) + "-" + state.passTimestamp;
+    const label = ui.label.value || core.passName(core.nextUnused(loadUsed()));
     const wavName = label + ".wav";
     const wav = core.encodeWav(src.frames, src.totalSamples, src.sampleRate);
     const manifest = core.buildManifest({
@@ -256,15 +274,18 @@
     if (!analyze) {
       downloadBlob(wavBlob, wavName);
       downloadBlob(jsonBlob, jsonName);
+      afterDownload(label);   // consume this Pass-N + advance the default to the next unused
+      transition("reset");    // back to idle so the user can record again without a refresh
       return;
     }
-    if (alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); }
+    if (alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); afterDownload(label); }
     ui.status.textContent = "Handing this capture to Local Analysis…";
     window.SensoryNavHandoff.putHandoff({ wavBlob: wavBlob, wavName: wavName, manifest: manifest, jsonName: jsonName, savedAt: Date.now() })
-      .then(function () { setTimeout(function () { window.location.href = "analyze.html"; }, alsoDl ? 500 : 0); })
+      .then(function () { setTimeout(function () { window.location.href = "analyze.html"; }, alsoDl ? 500 : 0); }) // navigates away — no reset needed
       .catch(function (err) {
         ui.warning.textContent = "Could not hand off to analysis (" + err.message + ") — downloaded the files instead.";
-        if (!alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); }
+        if (!alsoDl) { downloadBlob(wavBlob, wavName); downloadBlob(jsonBlob, jsonName); afterDownload(label); }
+        transition("reset"); // stayed on the page — return to idle
       });
   }
 
@@ -291,11 +312,6 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), CONFIG.objectUrlRevokeMs);
-  }
-
-  function hhmmss(date) {
-    const p = (n) => String(n).padStart(2, "0");
-    return p(date.getHours()) + p(date.getMinutes()) + p(date.getSeconds());
   }
 
   function showError(err) { ui.status.textContent = "Error: " + err.message; }
