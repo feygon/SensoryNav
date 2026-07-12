@@ -1,0 +1,23 @@
+# Enforce LF line endings in-tree on every platform.
+#
+# Why: the byte-identity gates (e.g. tests/fixture-pipeline.test.js) compare a
+# committed golden read with fs.readFileSync(..., "utf8") against JSON.stringify
+# output, which is always LF. On Windows, git's core.autocrlf=true otherwise
+# checks the golden out as CRLF, so every line "differs" by a trailing \r and the
+# test fails locally while passing on CI (Linux). eol=lf keeps the working tree LF
+# so Windows and CI agree. The committed blobs are already LF — this changes no
+# stored content, only how files are written to the working tree on checkout.
+* text=auto eol=lf
+
+# Binary assets: never apply text/eol conversion or line-diffing.
+*.wav binary
+*.ttf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
