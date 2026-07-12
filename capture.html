@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>SensoryNav — Capture &amp; Pipeline</title>
+  <link rel="stylesheet" href="styles.css?v=0.2.6">
+  <link rel="stylesheet" href="pipeline.css?v=0.2.6">
+  <link rel="stylesheet" href="capture.css?v=0.2.6">
+  <script src="theme.js?v=0.2.6"></script>
+  <script src="pipeline.js"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site">
+    <a href="index.html">Home</a>
+    <a href="capture.html" aria-current="page">Capture</a>
+    <button type="button" class="theme-button" data-theme-toggle></button>
+  </nav>
+
+  <div class="dash">
+    <h1>Capture &amp; Pipeline</h1>
+    <p class="sub">Record a drive, analyze it on your device, and see what it becomes — the front end of a road-feel map for sensory-sensitive drivers.</p>
+
+    <!-- Shared pipeline/tier strip (pipeline.js) — same visual on every page. -->
+    <div id="pipeline-strip" data-active="capture"></div>
+
+    <div class="grid">
+      <!-- Recorder card: all live-recorder hooks preserved (capture.js binds these IDs). -->
+      <section class="card rec" aria-label="Recorder">
+        <h2>Recorder</h2>
+        <p id="status" aria-live="polite">State: idle</p>
+        <p id="warning" class="warning" aria-live="assertive"></p>
+
+        <label for="label">Pass base name</label>
+        <input id="label" type="text" placeholder="Pass-1">
+        <label for="notes">Pre-drive notes</label>
+        <input id="notes" type="text" placeholder="dry, ~35mph">
+
+        <div class="controls">
+          <button id="start" type="button">Start recording</button>
+          <button id="stop" type="button" disabled>Stop recording</button>
+        </div>
+
+        <div class="stop-opts" aria-label="On stop">
+          <label class="stop-opt"><input type="checkbox" id="analyze-on-stop" checked> Analyze upon stopping</label>
+          <label class="stop-opt"><input type="checkbox" id="also-download" checked> Also download files</label>
+        </div>
+
+        <div class="trim-opts" aria-label="Optional privacy trims">
+          <label class="trim-opt" data-tip="Optional, for deidentifying GPS. If checked, the first 30 s of audio and GPS fixes are removed at download — the start of your trip (often near home) is never written to a file.">
+            <input type="checkbox" id="trim-start"> Remove first 30&nbsp;s <span class="tipmark" aria-hidden="true">&#9432;</span>
+          </label>
+          <label class="trim-opt" data-tip="Optional, for deidentifying GPS. If checked, the last 30 s of audio and GPS fixes are removed at download — the end of your trip (often near home) is never written to a file.">
+            <input type="checkbox" id="trim-end"> Remove last 30&nbsp;s <span class="tipmark" aria-hidden="true">&#9432;</span>
+          </label>
+        </div>
+
+        <label for="level">Audio level</label>
+        <progress id="level" max="1" value="0"></progress>
+        <p id="gps" aria-live="polite">GPS: acquiring…</p>
+        <p class="hint">Runs on your device. For safety, start before you drive — no glancing at the screen underway.</p>
+      </section>
+
+      <!-- Stat tiles: a glance at what the pipeline measures. -->
+      <div class="tiles" aria-label="Pipeline at a glance">
+        <div class="tile"><div class="n">4</div><div class="k">frequency bands (sub-bass 20–80 Hz + low/mid/high)</div></div>
+        <div class="tile"><div class="n">4</div><div class="k">governed acoustic tags (value + confidence)</div></div>
+        <div class="tile"><div class="n">580 s</div><div class="k">sample pass shown below (audio-free)</div></div>
+        <div class="tile"><div class="n">ICC 0.63</div><div class="k">cross-pass positional reproducibility (5 passes)</div></div>
+      </div>
+    </div>
+
+    <!-- Sample visualization: the recorder's output, rendered from deidentified JSON. -->
+    <section aria-label="Sample visualization">
+      <div class="vizhead">
+        <h2>Sample output — a scored pass</h2>
+        <a href="sample/timeline-jc4.html" target="_blank" rel="noopener">Open full view ↗</a>
+      </div>
+      <iframe class="viz-frame" src="sample/timeline-jc4.html" title="Sample scored pass — speed, roughness, and sub-bass chaos over time" loading="lazy"></iframe>
+      <p class="foot">This is what a capture becomes after on-device analysis: speed and felt-roughness over time, plus a folded sub-bass panel (hue = tonal→chaotic, thickness = chaos) and tagged acoustic events. Rendered live in your browser from a <strong>deidentified</strong> JSON — first 580 seconds, <strong>no audio</strong>, GPS trace removed. The full product aggregates thousands of such passes into the road-feel map above.</p>
+    </section>
+  </div>
+
+  <!-- Pure modules first (attach to window.SensoryNavCore), then the orchestrator. Unchanged. -->
+  <script src="recorder/wav-encoder.js"></script>
+  <script src="recorder/gps-track.js"></script>
+  <script src="recorder/capture-state.js"></script>
+  <script src="recorder/capture-manifest.js"></script>
+  <script src="recorder/trim-capture.js"></script>
+  <script src="recorder/capture-handoff.js"></script>
+  <script src="recorder/pass-namer.js"></script>
+  <script src="capture.js"></script>
+</body>
+</html>

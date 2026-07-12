@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>SensoryNav</title>
+  <link rel="stylesheet" href="styles.css?v=0.2.6">
+  <script src="theme.js?v=0.2.6"></script>
+</head>
+<body>
+  <div id="build-version">v...</div>
+  <nav class="site-nav" aria-label="Site">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="links.html">Links</a>
+    <a href="tingles.html">Tingles</a>
+  </nav>
+  <h1>SensoryNav</h1>
+  <div class="soon">Coming soon</div>
+  <p id="mode-copy">A map with a calmer route for people who want smoother, quieter roads, and fewer sensory ambushes, <strong>like this nasty white webpage</strong>. Click <button type="button" class="theme-button inline-theme-button" id="dark-mode-link" data-theme-toggle></button> for dark mode.</p>
+
+  <form id="waitlist-form">
+    <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" required>
+    <button type="submit">Join waitlist</button>
+  </form>
+  <p id="form-status" aria-live="polite"></p>
+
+  <figure class="comic-preview">
+    <img src="assets/sensorynav-comic.png?v=0.2.5" alt="Three-panel comic showing a forward road view, white-knuckled driving through road noise, and relief on a smooth new road surface.">
+  </figure>
+
+  <script src="app.js?v=0.2.5"></script>
+</body>
+</html>

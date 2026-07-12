@@ -1,0 +1,28 @@
+"use strict";
+
+const CONSTANTS = Object.freeze({
+  FFT_SIZE: 2048,
+  SMOOTHING_TIME_CONSTANT: 0,
+  ASSUMED_SAMPLE_RATE_HZ: 48000,
+  WINDOW_DURATION_MS: 1000,
+  ENERGY_FLOOR_MIN: 1e-6,
+  PAIR_MAX_SKEW_SECONDS: 5,
+  // Canonical band weighting for the roughness scalar (single source of truth). low leads
+  // (road rumble), high is de-emphasized (cargo rattle + speech consonants, not road). This is
+  // the former "research/timeline" set, now used everywhere — the earlier product weighting
+  // (0.45/0.4/0.15) was removed so the app, the SP3 scorer, and the timeline can never diverge.
+  WEIGHTS: Object.freeze({ low: 0.6, mid: 0.3, high: 0.1 }),
+  SCORE_SCALE: 50,
+  BANDS: Object.freeze({
+    low: Object.freeze([80, 250]),
+    mid: Object.freeze([250, 1000]),
+    high: Object.freeze([1000, 4000])
+  })
+});
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { CONSTANTS };
+}
+if (typeof self !== "undefined") {
+  self.SensoryNavCore = Object.assign(self.SensoryNavCore || {}, { CONSTANTS });
+}
