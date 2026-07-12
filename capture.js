@@ -66,6 +66,25 @@
     setDefaultName();
   }
 
+  // Couple "Also download files" to "Analyze upon stopping": when analyze is OFF, a non-analyzed capture
+  // is only saved by downloading it, so also-download is mandatory (checked + disabled). When analyze is
+  // ON, also-download defaults checked but the user may uncheck it (analyze-only). Called on load and on
+  // every analyze-on-stop change; re-checking analyze resets also-download to checked (no manual-state
+  // memory, by design — see docs/superpowers/specs/2026-07-11-download-checkbox-coupling.md).
+  const FORCED_DL_TITLE = "Required — a non-analyzed capture must be downloaded or it's lost.";
+  function syncDownloadCoupling() {
+    if (!ui.analyzeOnStop || !ui.alsoDownload) { return; }
+    if (ui.analyzeOnStop.checked) {
+      ui.alsoDownload.disabled = false;
+      ui.alsoDownload.checked = true;
+      ui.alsoDownload.removeAttribute("title");
+    } else {
+      ui.alsoDownload.checked = true;
+      ui.alsoDownload.disabled = true;
+      ui.alsoDownload.title = FORCED_DL_TITLE;
+    }
+  }
+
   let ui = {};
 
   function init() {
@@ -85,8 +104,10 @@
     };
     ui.start.addEventListener("click", onStart);
     ui.stop.addEventListener("click", onStop);
+    ui.analyzeOnStop.addEventListener("change", syncDownloadCoupling);
     document.addEventListener("visibilitychange", onVisibility);
     setDefaultName(); // default the label to the lowest unused Pass-N
+    syncDownloadCoupling(); // reconcile also-download's checked/disabled state to the initial analyze state
     render();
   }
 
